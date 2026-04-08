@@ -154,6 +154,11 @@ public:
   /** stop the control loop. use within callback, or from a separate thread. */
   virtual void stop() {running_ = false;}
 
+  /** Deactivate the EtherCAT master. Forces all slaves back to INIT state.
+   *  This causes CiA402 drives to leave OPERATION_ENABLED and engage brakes.
+   *  Must not be called from a realtime context. */
+  virtual void deactivate();
+
   /** time of last ethercat update, since calling run. stops if stop called.
    *  returns actual time. use elapsedCycles()/frequency for discrete time at last update. */
   virtual double elapsedTime();
@@ -204,6 +209,23 @@ public:
    */
   void transferAll();
 
+  /** @brief Get domain working counter state.
+   *  @return EC_WC_ZERO, EC_WC_INCOMPLETE, or EC_WC_COMPLETE
+   */
+  unsigned int getDomainWcState(uint32_t domain = 0);
+
+  /** @brief Get current master AL states */
+  uint8_t getMasterAlStates();
+
+  /** @brief Check if link is up */
+  bool isMasterLinkUp();
+
+  /** @brief Get number of responding slaves */
+  unsigned int getRespondingSlaves();
+
+  /** @brief Get expected number of slaves */
+  size_t getExpectedSlaves() { return slave_info_.size(); }
+
 protected:
   /** @brief Output the memory content of the all the domains
    * (available for pedagogic and debug purposes)
@@ -233,6 +255,9 @@ protected:
 protected:
   /** true if running */
   volatile bool running_ = false;
+
+  /** true if master has been activated via ecrt_master_activate */
+  volatile bool activated_ = false;
 
   /** start and current time */
   std::chrono::time_point<std::chrono::system_clock> start_t_, curr_t_;

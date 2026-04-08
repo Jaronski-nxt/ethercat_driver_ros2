@@ -65,11 +65,10 @@ EcMaster::EcMaster(const unsigned int master)
 
 EcMaster::~EcMaster()
 {
-  /*
-  for (SlaveInfo & slave : slave_info_) {
-    //TODO verify what this piece of code was here for
+  if (master_ != NULL) {
+    ecrt_release_master(master_);
+    master_ = NULL;
   }
-  */
   for (auto & domain : domain_info_) {
     if (domain.second != NULL) {
       delete domain.second;
@@ -102,6 +101,9 @@ void EcMaster::addSlave(EcSlave * slave)
     printWarning("Add slave. Failed to get slave configuration.");
     return;
   }
+
+  // Configure SM watchdog: 2500 × 40ns = 100µs base, 1000 intervals = 100ms timeout
+  ecrt_slave_config_watchdog(slave_info.config, 2500, 1000);
 
   // check and setup dc
 
@@ -234,6 +236,7 @@ void EcMaster::registerPDOInDomain(
 
 bool EcMaster::activate()
 {
+  activated_ = false;
   // register domain
   for (auto & iter : domain_info_) {
     DomainInfo * domain_info = iter.second;
@@ -272,7 +275,37 @@ bool EcMaster::activate()
       return false;
     }
   }
+  activated_ = true;
   return true;
+}
+
+void EcMaster::deactivate()
+{
+  if (!activated_) {
+    return;
+  }
+  running_ = false;
+  activated_ = false;
+
+  if (master_ != NULL) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("EthercatDriver"),
+      "Deactivating EtherCAT master — slaves will return to INIT, brakes will engage.");
+    ecrt_master_deactivate(master_);
+
+    // Release master completely — puts IgH kernel in orphan mode.
+    // This prevents the idle scanning thread from re-establishing
+    // slave states when cable is re-inserted after communication loss.
+    ecrt_release_master(master_);
+    master_ = NULL;
+  }
+
+  // Invalidate all domain process data pointers
+  for (auto & iter : domain_info_) {
+    if (iter.second != NULL) {
+      iter.second->domain_pd = NULL;
+    }
+  }
 }
 
 void EcMaster::update(uint32_t domain)
@@ -681,6 +714,46 @@ void EcMaster::printMemoryFrame(
     }
     os << std::endl;
   }
+}
+
+unsigned int EcMaster::getDomainWcState(uint32_t domain)
+{
+  if (domain_info_.count(domain) == 0 || domain_info_.at(domain) == NULL) {
+    return EC_WC_ZERO;
+  }
+  ec_domain_state_t ds;
+  ecrt_domain_state(domain_info_.at(domain)->domain, &ds);
+  return ds.wc_state;
+}
+
+uint8_t EcMaster::getMasterAlStates()
+{
+  if (master_ == NULL) {
+    return 0;
+  }
+  ec_master_state_t ms;
+  ecrt_master_state(master_, &ms);
+  return ms.al_states;
+}
+
+bool EcMaster::isMasterLinkUp()
+{
+  if (master_ == NULL) {
+    return false;
+  }
+  ec_master_state_t ms;
+  ecrt_master_state(master_, &ms);
+  return ms.link_up != 0;
+}
+
+unsigned int EcMaster::getRespondingSlaves()
+{
+  if (master_ == NULL) {
+    return 0;
+  }
+  ec_master_state_t ms;
+  ecrt_master_state(master_, &ms);
+  return ms.slaves_responding;
 }
 
 }  // namespace ethercat_interface

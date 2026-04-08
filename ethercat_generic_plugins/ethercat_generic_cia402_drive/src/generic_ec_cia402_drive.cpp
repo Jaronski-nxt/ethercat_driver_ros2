@@ -57,25 +57,23 @@ void EcCiA402Drive::processData(size_t entry_idx, uint8_t * domain_address)
   ethercat_interface::EcPdoSingleInterfaceChannelManager & channel(*channel_ptr);
   // Special case: ControlWord
   if (channel.index == CiA402D_RPDO_CONTROLWORD) {
-    if (is_operational_) {
-      if (fault_reset_command_interface_index_ >= 0) {
-        if (command_interface_ptr_->at(fault_reset_command_interface_index_) == 0) {
-          last_fault_reset_command_ = false;
-        }
-        if (last_fault_reset_command_ == false &&
-          command_interface_ptr_->at(fault_reset_command_interface_index_) != 0 &&
-          !std::isnan(command_interface_ptr_->at(fault_reset_command_interface_index_)))
-        {
-          last_fault_reset_command_ = true;
-          fault_reset_ = true;
-        }
+    if (fault_reset_command_interface_index_ >= 0) {
+      if (command_interface_ptr_->at(fault_reset_command_interface_index_) == 0) {
+        last_fault_reset_command_ = false;
       }
+      if (last_fault_reset_command_ == false &&
+        command_interface_ptr_->at(fault_reset_command_interface_index_) != 0 &&
+        !std::isnan(command_interface_ptr_->at(fault_reset_command_interface_index_)))
+      {
+        last_fault_reset_command_ = true;
+        fault_reset_ = true;
+      }
+    }
 
-      if (auto_state_transitions_) {
-        channel.default_value = transition(
-          state_,
-          channel.ec_read(domain_address));
-      }
+    if (auto_state_transitions_) {
+      channel.default_value = transition(
+        state_,
+        channel.ec_read(domain_address));
     }
   }
 

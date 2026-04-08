@@ -62,6 +62,9 @@ public:
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & previous_state) override;
 
   ETHERCAT_DRIVER_PUBLIC
+  CallbackReturn on_error(const rclcpp_lifecycle::State & previous_state) override;
+
+  ETHERCAT_DRIVER_PUBLIC
   hardware_interface::return_type read(const rclcpp::Time &, const rclcpp::Duration &) override;
 
   ETHERCAT_DRIVER_PUBLIC
@@ -126,6 +129,12 @@ protected:
   std::shared_ptr<ethercat_interface::EcMaster> master_;
   std::mutex ec_mutex_;
   bool activated_;
+
+  // Safety: activation timeout in seconds (default 30s)
+  static constexpr double kActivationTimeoutSec = 30.0;
+  // Safety: max consecutive read/write lock failures before reporting ERROR
+  static constexpr int kMaxConsecutiveLockFailures = 50;
+  int consecutive_lock_failures_ = 0;
 
   /** Transfer nets */
   std::vector<ethercat_interface::EcTransferNet> ec_transfer_nets_;
