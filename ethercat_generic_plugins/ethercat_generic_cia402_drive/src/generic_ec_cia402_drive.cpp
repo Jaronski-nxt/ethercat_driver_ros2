@@ -80,8 +80,34 @@ void EcCiA402Drive::processData(size_t entry_idx, uint8_t * domain_address)
   // setup current position as default position
   if (channel.index == CiA402D_RPDO_POSITION) {
     if (mode_of_operation_display_ != ModeOfOperation::MODE_NO_MODE) {
-      channel.default_value =
-        channel.factor * last_position_ + channel.offset;
+
+      // Robust check: command interface must exist, be mapped, and point to a valid value.
+      bool controller_active = false;
+      if (channel.has_command_interface_name(0) && channel.is_command_interface_defined()) {
+        const size_t cmd_idx = channel.command_interface_index(0);
+        if (cmd_idx < command_interface_ptr_->size()) {
+          controller_active = !std::isnan(command_interface_ptr_->at(cmd_idx));
+        }
+      }
+      if (controller_active) {
+        // jt_controller AKTIV: original Logik, alles wie gehabt
+        channel.default_value =
+          channel.factor * last_position_ + channel.offset;
+        // Flag zurücksetzen: wenn Controller wieder loslässt,
+        // wird aktuelle Position neu gelatcht
+        position_hold_initialized_ = false;
+      } 
+      else {
+        // jt_controller INAKTIV: Position einmal latchen und halten
+        // Verhindert Drift durch Floating-Point Akkumulation bei 1000 Hz
+        if (!position_hold_initialized_) {
+          channel.default_value =
+            channel.factor * last_position_ + channel.offset;
+          position_hold_initialized_ = true;
+        }
+        // default_value bleibt unverändert → kein Drift, Motor hält Position
+      }
+
     }
     channel.override_command =
       (mode_of_operation_display_ != ModeOfOperation::MODE_CYCLIC_SYNC_POSITION) ? true : false;
