@@ -14,9 +14,11 @@
 
 #include "ethercat_driver/ethercat_driver.hpp"
 
+#include <chrono>
 #include <tinyxml2.h>
 #include <string>
 #include <regex>
+#include <thread>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -528,8 +530,8 @@ CallbackReturn EthercatDriver::on_activate(
   }
   RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Starting ...please wait...");
 
-  // Reset safety counters
-  consecutive_lock_failures_ = 0;
+  // Reset WC error counter
+  consecutive_wc_failures_ = 0;
 
   // setup master
   setupMaster();
@@ -542,29 +544,6 @@ CallbackReturn EthercatDriver::on_activate(
   }
   RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Activated EcMaster!");
 
-  // === PRE-CHECK: Verify link is up ===
-  if (!master_->isMasterLinkUp()) {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("EthercatDriver"),
-      "SAFETY: EtherCAT link is DOWN. Cannot activate.");
-    return CallbackReturn::ERROR;
-  }
-
-  // === PRE-CHECK: Verify all expected slaves are responding ===
-  unsigned int responding = master_->getRespondingSlaves();
-  size_t expected = master_->getExpectedSlaves();
-  if (responding < expected) {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("EthercatDriver"),
-      "SAFETY: Only %u of %zu expected slaves responding. Cannot activate.",
-      responding, expected);
-    return CallbackReturn::ERROR;
-  }
-  RCLCPP_INFO(
-    rclcpp::get_logger("EthercatDriver"),
-    "Pre-check passed: %u/%zu slaves responding, link up.",
-    responding, expected);
-
   // Configure transfer network if transfer nets are defined
   if (!ec_transfer_nets_.empty()) {
     RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Configuring transfer network...");
@@ -572,13 +551,15 @@ CallbackReturn EthercatDriver::on_activate(
     RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Transfer network configured!");
   }
 
-  // === ACTIVATION LOOP WITH TIMEOUT ===
+  // Activation loop: wait until all slaves are operational AND domain is COMPLETE
   struct timespec t;
   clock_gettime(CLOCK_MONOTONIC, &t);
-  t.tv_sec++;
-
-  struct timespec start_time;
-  clock_gettime(CLOCK_MONOTONIC, &start_time);
+  // Add first interval to initial time (not 1 second!)
+  t.tv_nsec += master_->getInterval();
+  while (t.tv_nsec >= 1000000000) {
+    t.tv_nsec -= 1000000000;
+    t.tv_sec++;
+  }
 
   bool running = true;
   while (running) {
@@ -587,7 +568,7 @@ CallbackReturn EthercatDriver::on_activate(
     // update EtherCAT bus
     master_->update();
 
-    // check if operational AND domain is COMPLETE
+    // check if all modules initialized AND domain is COMPLETE
     bool isAllInit = true;
     for (auto & module : ec_modules_) {
       isAllInit = isAllInit && module->initialized();
@@ -599,47 +580,12 @@ CallbackReturn EthercatDriver::on_activate(
       }
     }
 
-    // === TIMEOUT CHECK ===
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    double elapsed = (now.tv_sec - start_time.tv_sec) +
-      (now.tv_nsec - start_time.tv_nsec) / 1e9;
-    if (elapsed > kActivationTimeoutSec) {
-      RCLCPP_ERROR(
-        rclcpp::get_logger("EthercatDriver"),
-        "SAFETY: Activation timeout after %.1f seconds! "
-        "Not all slaves reached operational state.", elapsed);
-      // Log which modules failed
-      for (size_t i = 0; i < ec_modules_.size(); i++) {
-        if (!ec_modules_[i]->initialized()) {
-          RCLCPP_ERROR(
-            rclcpp::get_logger("EthercatDriver"),
-            "  Module %zu NOT initialized (pos: %s)",
-            i, ec_module_parameters_[i].count("position") ?
-            ec_module_parameters_[i].at("position").c_str() : "unknown");
-        }
-      }
-      master_->stop();
-      return CallbackReturn::ERROR;
-    }
-
     // calculate next shot
     t.tv_nsec += master_->getInterval();
     while (t.tv_nsec >= 1000000000) {
       t.tv_nsec -= 1000000000;
       t.tv_sec++;
     }
-  }
-
-  // === POST-CHECK: Verify domain is COMPLETE ===
-  unsigned int wc_state = master_->getDomainWcState(0);
-  if (wc_state != EC_WC_COMPLETE) {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("EthercatDriver"),
-      "Domain WC state is not COMPLETE after activation (state=%u). "
-      "Aborting.", wc_state);
-    master_->deactivate();
-    return CallbackReturn::ERROR;
   }
 
   RCLCPP_INFO(
@@ -655,6 +601,7 @@ CallbackReturn EthercatDriver::on_deactivate(
 {
   const std::lock_guard<std::mutex> lock(ec_mutex_);
   activated_ = false;
+  consecutive_wc_failures_ = 0;
 
   RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Stopping ...please wait...");
 
@@ -670,19 +617,33 @@ CallbackReturn EthercatDriver::on_deactivate(
 CallbackReturn EthercatDriver::on_error(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  const std::lock_guard<std::mutex> lock(ec_mutex_);
-  RCLCPP_ERROR(
-    rclcpp::get_logger("EthercatDriver"),
-    "SAFETY: Hardware error detected — stopping EtherCAT master!");
+  {
+    const std::lock_guard<std::mutex> lock(ec_mutex_);
+    RCLCPP_ERROR(
+      rclcpp::get_logger("EthercatDriver"),
+      "SAFETY: Hardware error detected — stopping EtherCAT master!");
 
-  if (activated_) {
-    activated_ = false;
-    master_->deactivate();
+    if (activated_) {
+      activated_ = false;
+      consecutive_wc_failures_ = 0;
+      master_->deactivate();
+    }
+
+    RCLCPP_ERROR(
+      rclcpp::get_logger("EthercatDriver"),
+      "EtherCAT master stopped. Requesting process shutdown.");
   }
 
-  RCLCPP_ERROR(
-    rclcpp::get_logger("EthercatDriver"),
-    "EtherCAT master stopped. System requires manual re-activation.");
+  // Request a clean process exit once, delayed a bit to let controller_manager
+  // finish its own error-cycle deactivation path first.
+  if (rclcpp::ok() && !shutdown_requested_.exchange(true)) {
+    std::thread([]() {
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      if (rclcpp::ok()) {
+        rclcpp::shutdown();
+      }
+    }).detach();
+  }
 
   return CallbackReturn::SUCCESS;
 }
@@ -694,34 +655,37 @@ hardware_interface::return_type EthercatDriver::read(
   // try to lock so we can avoid blocking the read/write loop on the lock.
   const std::unique_lock<std::mutex> lock(ec_mutex_, std::try_to_lock);
   if (lock.owns_lock() && activated_) {
-    consecutive_lock_failures_ = 0;
     master_->readData();
 
     // === SAFETY: Check link status — immediate ERROR on link down ===
     if (!master_->isMasterLinkUp()) {
       RCLCPP_ERROR(
         rclcpp::get_logger("EthercatDriver"),
-        "SAFETY: EtherCAT link DOWN — returning ERROR to stop all controllers!");
+        "SAFETY: EtherCAT link DOWN — stopping EtherCAT master immediately and returning ERROR!");
+      // Immediate stop path: prevent any further writeData() in this cycle.
+      activated_ = false;
+      consecutive_wc_failures_ = 0;
+      master_->deactivate();
       return hardware_interface::return_type::ERROR;
     }
 
     // === SAFETY: Check domain WKC — immediate ERROR when not COMPLETE ===
     unsigned int wc_state = master_->getDomainWcState(0);
     if (wc_state != EC_WC_COMPLETE) {
-      RCLCPP_ERROR(
+      consecutive_wc_failures_++;
+      if (consecutive_wc_failures_ >= kMaxConsecutiveWcFailures) {
+        RCLCPP_ERROR(
+          rclcpp::get_logger("EthercatDriver"),
+          "SAFETY: Domain WC not COMPLETE for %d consecutive cycles (last state=%u) — returning ERROR!",
+          consecutive_wc_failures_, wc_state);
+        return hardware_interface::return_type::ERROR;
+      }
+      RCLCPP_WARN(
         rclcpp::get_logger("EthercatDriver"),
-        "SAFETY: Domain WC not COMPLETE (state=%u) — returning ERROR!", wc_state);
-      return hardware_interface::return_type::ERROR;
-    }
-  } else if (activated_) {
-    // Lock failed while system is active — data not updated this cycle
-    consecutive_lock_failures_++;
-    if (consecutive_lock_failures_ >= kMaxConsecutiveLockFailures) {
-      RCLCPP_ERROR(
-        rclcpp::get_logger("EthercatDriver"),
-        "SAFETY: %d consecutive read lock failures. System unresponsive!",
-        consecutive_lock_failures_);
-      return hardware_interface::return_type::ERROR;
+        "Domain WC transient fault %d/%d (state=%u).",
+        consecutive_wc_failures_, kMaxConsecutiveWcFailures, wc_state);
+    } else {
+      consecutive_wc_failures_ = 0;
     }
   }
   return hardware_interface::return_type::OK;

@@ -19,6 +19,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <atomic>
 #include <pluginlib/class_loader.hpp>
 #include "hardware_interface/handle.hpp"
 #include "hardware_interface/hardware_info.hpp"
@@ -111,6 +112,10 @@ protected:
   void configTransferNetwork();
 
 protected:
+  // Keep class loader before plugin instances so instances are destroyed first.
+  pluginlib::ClassLoader<ethercat_interface::EcSlave> ec_loader_{
+    "ethercat_interface", "ethercat_interface::EcSlave"};
+
   std::vector<std::shared_ptr<ethercat_interface::EcSlave>> ec_modules_;
   std::vector<std::unordered_map<std::string, std::string>> ec_module_parameters_;
 
@@ -121,20 +126,16 @@ protected:
   std::vector<std::vector<double>> hw_sensor_states_;
   std::vector<std::vector<double>> hw_gpio_states_;
 
-  pluginlib::ClassLoader<ethercat_interface::EcSlave> ec_loader_{
-    "ethercat_interface", "ethercat_interface::EcSlave"};
-
   double control_frequency_;
 
   std::shared_ptr<ethercat_interface::EcMaster> master_;
   std::mutex ec_mutex_;
   bool activated_;
 
-  // Safety: activation timeout in seconds (default 30s)
-  static constexpr double kActivationTimeoutSec = 30.0;
-  // Safety: max consecutive read/write lock failures before reporting ERROR
-  static constexpr int kMaxConsecutiveLockFailures = 50;
-  int consecutive_lock_failures_ = 0;
+  // Safety: tolerate short WC glitches, fail only on persistent non-COMPLETE domain state
+  static constexpr int kMaxConsecutiveWcFailures = 1;
+  int consecutive_wc_failures_ = 0;
+  std::atomic_bool shutdown_requested_{false};
 
   /** Transfer nets */
   std::vector<ethercat_interface::EcTransferNet> ec_transfer_nets_;
