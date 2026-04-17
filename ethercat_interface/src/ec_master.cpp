@@ -102,8 +102,10 @@ void EcMaster::addSlave(EcSlave * slave)
     return;
   }
 
-  // Configure SM watchdog: 2500 × 40ns = 100µs base, 1000 intervals = 100ms timeout
-  ecrt_slave_config_watchdog(slave_info.config, 2500, 1000);
+  // Configure SM watchdog (about 100 ms timeout)
+  uint16_t divider = 2498;
+  uint16_t intervals = 1000;
+  ecrt_slave_config_watchdog(slave_info.config, divider, intervals);
 
   // check and setup dc
 
@@ -342,7 +344,7 @@ void EcMaster::update(uint32_t domain)
 
   struct timespec t;
 
-  clock_gettime(CLOCK_REALTIME, &t);
+  clock_gettime(CLOCK_MONOTONIC, &t);
   ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
   ecrt_master_sync_reference_clock(master_);
   ecrt_master_sync_slave_clocks(master_);
@@ -405,7 +407,7 @@ void EcMaster::writeData(uint32_t domain)
 
   struct timespec t;
 
-  clock_gettime(CLOCK_REALTIME, &t);
+  clock_gettime(CLOCK_MONOTONIC, &t);
   ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
   ecrt_master_sync_reference_clock(master_);
   ecrt_master_sync_slave_clocks(master_);
