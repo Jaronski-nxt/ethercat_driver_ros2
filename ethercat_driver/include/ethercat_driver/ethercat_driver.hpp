@@ -133,7 +133,7 @@ protected:
   bool activated_;
 
   // Safety: tolerate short WC glitches, fail only on persistent non-COMPLETE domain state
-  static constexpr int kMaxConsecutiveWcFailures = 1;
+  static constexpr int kMaxConsecutiveWcFailures = 5;
   int consecutive_wc_failures_ = 0;
   std::atomic_bool shutdown_requested_{false};
 
