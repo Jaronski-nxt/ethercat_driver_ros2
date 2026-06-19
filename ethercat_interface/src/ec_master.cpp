@@ -108,16 +108,33 @@ void EcMaster::addSlave(EcSlave * slave)
   ecrt_slave_config_watchdog(slave_info.config, divider, intervals);
 
   // check and setup dc
-
+  //
+  // Distributed-Clocks SYNC0 setup. The SYNC0 shift MUST be identical for every
+  // slave on the bus so that all drives latch SYNC0 at the same phase relative
+  // to the common reference clock. The authoritative application time for the
+  // whole bus is set exactly once in activate() right before
+  // ecrt_master_activate(); programming it here (per slave) is redundant and
+  // was actively harmful:
+  //
+  // The previous implementation read a FRESH CLOCK_MONOTONIC timestamp for each
+  // slave and derived both the (redundant) application time AND the SYNC0 shift
+  // `interval_ - (t.tv_nsec % interval_)` from it. Because addSlave() runs once
+  // per slave, every drive received a DIFFERENT, effectively random SYNC0 phase.
+  // During the SAFEOP->OP transition the master then waited for each drive's
+  // individual SYNC0 alignment, which produced the non-deterministic 1-5 s
+  // per-joint init delay measured in docs/ethercat-analysis (DC-OFF control test
+  // initialised all 6 joints in ~0.87 s with constant ~90 ms spacing).
+  //
+  // Fix: use a single, fixed SYNC0 shift (cycle midpoint) applied identically to
+  // every DC slave. This keeps SYNC0 well clear of the frame-arrival edge while
+  // guaranteeing a common, deterministic phase for the whole bus.
   if (slave->assign_activate_dc_sync()) {
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
+    const uint32_t sync0_shift = interval_ / 2;
     ecrt_slave_config_dc(
       slave_info.config,
       slave->assign_activate_dc_sync(),
       interval_,
-      interval_ - (t.tv_nsec % (interval_)),
+      sync0_shift,
       0,
       0);
   }
