@@ -491,6 +491,29 @@ CallbackReturn EthercatDriver::configNetwork()
     }
   }
 
+  // Get init readiness-gate parameters (optional; defaults preserve behaviour)
+  if (info_.hardware_parameters.find("init_timeout") != info_.hardware_parameters.end()) {
+    try {
+      init_timeout_ = std::stod(info_.hardware_parameters["init_timeout"]);
+    } catch (std::exception & e) {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"), "Invalid init_timeout (%s)!", e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
+  if (info_.hardware_parameters.find("init_stable_cycles") != info_.hardware_parameters.end()) {
+    try {
+      init_stable_cycles_ = std::stoi(info_.hardware_parameters["init_stable_cycles"]);
+    } catch (std::exception & e) {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"), "Invalid init_stable_cycles (%s)!", e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
+  if (init_stable_cycles_ < 1) {
+    init_stable_cycles_ = 1;
+  }
+
   // start EC and wait until state operative
 
   master_->setCtrlFrequency(control_frequency_);
@@ -551,9 +574,13 @@ CallbackReturn EthercatDriver::on_activate(
     RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Transfer network configured!");
   }
 
-  // Activation loop: wait until all slaves are operational AND domain is COMPLETE
+  // Activation loop: wait until ALL modules are simultaneously fully ready
+  // (EtherCAT bus-OP + domain WC COMPLETE + CiA402 OPERATION_ENABLED + valid
+  // actual position), stable over init_stable_cycles_ consecutive cycles.
+  // On init_timeout_ the activation aborts hard and reports the stuck module(s).
   struct timespec t;
   clock_gettime(CLOCK_MONOTONIC, &t);
+  const struct timespec t_start = t;
   // Add first interval to initial time (not 1 second!)
   t.tv_nsec += master_->getInterval();
   while (t.tv_nsec >= 1000000000) {
@@ -561,6 +588,7 @@ CallbackReturn EthercatDriver::on_activate(
     t.tv_sec++;
   }
 
+  int stable_cycles = 0;
   bool running = true;
   while (running) {
     // wait until next shot
@@ -568,16 +596,47 @@ CallbackReturn EthercatDriver::on_activate(
     // update EtherCAT bus
     master_->update();
 
-    // check if all modules initialized AND domain is COMPLETE
-    bool isAllInit = true;
+    // Full readiness: domain COMPLETE AND every module bus-OP + command-ready
+    // + valid position. For non-drive slaves readyForCommands()/hasValidPosition()
+    // fall back to safe defaults, so they only require bus-level readiness.
+    bool allReady = (master_->getDomainWcState(0) == EC_WC_COMPLETE);
     for (auto & module : ec_modules_) {
-      isAllInit = isAllInit && module->initialized();
+      allReady = allReady &&
+        module->initialized() &&
+        module->readyForCommands() &&
+        module->hasValidPosition();
     }
-    if (isAllInit) {
+
+    stable_cycles = allReady ? (stable_cycles + 1) : 0;
+    if (stable_cycles >= init_stable_cycles_) {
+      running = false;
+    }
+
+    // Timeout guard: abort hard and report which module(s) are not ready
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    double elapsed = (now.tv_sec - t_start.tv_sec) +
+      (now.tv_nsec - t_start.tv_nsec) * 1e-9;
+    if (running && elapsed > init_timeout_) {
       unsigned int wc = master_->getDomainWcState(0);
-      if (wc == EC_WC_COMPLETE) {
-        running = false;
+      RCLCPP_ERROR(
+        rclcpp::get_logger("EthercatDriver"),
+        "Activation TIMEOUT after %.1f s (limit %.1f s): system not ready. "
+        "Domain WC state: %u (need %u=COMPLETE).",
+        elapsed, init_timeout_, wc, static_cast<unsigned int>(EC_WC_COMPLETE));
+      for (size_t i = 0; i < ec_modules_.size(); ++i) {
+        auto & module = ec_modules_[i];
+        bool ok = module->initialized() &&
+          module->readyForCommands() &&
+          module->hasValidPosition();
+        if (!ok) {
+          RCLCPP_ERROR(
+            rclcpp::get_logger("EthercatDriver"),
+            "  Module %zu (alias %u, pos %u) NOT ready: %s",
+            i, module->alias_, module->position_, module->statusString().c_str());
+        }
       }
+      return CallbackReturn::ERROR;
     }
 
     // calculate next shot

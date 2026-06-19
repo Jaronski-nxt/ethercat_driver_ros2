@@ -70,6 +70,18 @@ public:
     return true;
   }
 
+  // --- Readiness-gate extensions (appended at end to preserve vtable ABI) ---
+  /** Returns true if the slave is fully ready to accept motion commands.
+   *  For CiA402 drives this means the drive reached OPERATION_ENABLED.
+   *  Default: equivalent to initialized() (bus-level readiness is enough for
+   *  non-drive slaves such as grippers, FT-sensors or transfer modules). */
+  virtual bool readyForCommands() {return initialized();}
+  /** Returns true if the slave reports a valid (finite) actual position.
+   *  Default: true (slaves without a position do not gate the startup). */
+  virtual bool hasValidPosition() {return true;}
+  /** Short human-readable readiness/status string for diagnostics/logging. */
+  virtual std::string statusString() {return is_operational_ ? "operational" : "not-operational";}
+
 public:
   inline
   void setAliasAndPosition(uint16_t alias, uint16_t position)

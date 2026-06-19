@@ -40,6 +40,13 @@ public:
    *  The transition through the state machine is handled automatically. */
   bool initialized();
 
+  /** True once the CiA402 device state machine reached OPERATION_ENABLED. */
+  bool readyForCommands() override;
+  /** True once a finite actual position (0x6064) has been received via TPDO. */
+  bool hasValidPosition() override;
+  /** CiA402 device-state name plus actual-position validity, for diagnostics. */
+  std::string statusString() override;
+
   virtual void processData(size_t entry_idx, uint8_t * domain_address);
 
   virtual bool setupSlave(

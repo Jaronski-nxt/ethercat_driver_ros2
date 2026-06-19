@@ -128,6 +128,17 @@ protected:
 
   double control_frequency_;
 
+  /** @brief Maximum time (seconds) to wait in on_activate() for all modules to
+   * become fully ready (bus-OP + CiA402 OPERATION_ENABLED + valid position).
+   * On timeout on_activate() aborts with CallbackReturn::ERROR.
+   * Configurable via hardware parameter "init_timeout"; default 30 s. */
+  double init_timeout_ = 30.0;
+  /** @brief Number of consecutive control cycles for which the full readiness
+   * condition must hold before the system is declared started. Guards against
+   * transient single-cycle readiness. Hardware parameter "init_stable_cycles";
+   * default 10. */
+  int init_stable_cycles_ = 10;
+
   std::shared_ptr<ethercat_interface::EcMaster> master_;
   std::mutex ec_mutex_;
   bool activated_;

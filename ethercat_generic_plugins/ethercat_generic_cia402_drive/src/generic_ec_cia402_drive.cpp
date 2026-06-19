@@ -15,6 +15,8 @@
 // Author: Maciej Bednarczyk (macbednarczyk@gmail.com)
 
 #include <numeric>
+#include <cmath>
+#include <string>
 
 #include "ethercat_generic_plugins/generic_ec_cia402_drive.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -27,6 +29,21 @@ EcCiA402Drive::EcCiA402Drive()
 EcCiA402Drive::~EcCiA402Drive() {}
 
 bool EcCiA402Drive::initialized() {return initialized_;}
+
+bool EcCiA402Drive::readyForCommands() {return state_ == STATE_OPERATION_ENABLED;}
+
+bool EcCiA402Drive::hasValidPosition() {return std::isfinite(last_position_);}
+
+std::string EcCiA402Drive::statusString()
+{
+  auto it = DEVICE_STATE_STR.find(state_);
+  std::string s = (it != DEVICE_STATE_STR.end()) ? it->second : "Unknown State";
+  s += std::isfinite(last_position_) ? " (pos ok)" : " (pos NaN)";
+  if (!is_operational_) {
+    s += " [bus not-OP]";
+  }
+  return s;
+}
 
 void EcCiA402Drive::updateState()
 {
