@@ -259,6 +259,12 @@ protected:
   /** true if master has been activated via ecrt_master_activate */
   volatile bool activated_ = false;
 
+  /** true if at least one slave configured Distributed Clocks (assign_activate
+   *  set in its yaml). When false, the master-side DC distribution
+   *  (application_time / sync_reference_clock / sync_slave_clocks) is skipped
+   *  so the bus runs free (SM-sync) like a DC-less setup. */
+  bool dc_used_ = false;
+
   /** start and current time */
   std::chrono::time_point<std::chrono::system_clock> start_t_, curr_t_;
 

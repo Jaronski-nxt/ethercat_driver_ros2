@@ -129,6 +129,7 @@ void EcMaster::addSlave(EcSlave * slave)
   // every DC slave. This keeps SYNC0 well clear of the frame-arrival edge while
   // guaranteeing a common, deterministic phase for the whole bus.
   if (slave->assign_activate_dc_sync()) {
+    dc_used_ = true;
     const uint32_t sync0_shift = interval_ / 2;
     ecrt_slave_config_dc(
       slave_info.config,
@@ -270,10 +271,20 @@ bool EcMaster::activate()
       return false;
     }
   }
-  // set application time
-  struct timespec t;
-  clock_gettime(CLOCK_MONOTONIC, &t);
-  ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
+  // set application time (only when DC is actually used by a slave)
+  // Seed the reference clock to the current master time so the initial
+  // DC offset is zero. Without this the IgH master must slew the reference
+  // slave clock from a random starting offset (up to the full 32-bit wrap
+  // ~4.3 s), causing the non-deterministic 5-30 s SAFEOP->OP delay.
+  if (dc_used_) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    uint64_t now_ns = EC_NEWTIMEVAL2NANO(t);
+    ecrt_master_application_time(master_, now_ns);
+#ifdef EC_HAVE_SYNC_TO
+    ecrt_master_sync_reference_clock_to(master_, now_ns);
+#endif
+  }
 
   // activate master
   bool activate_status = ecrt_master_activate(master_);
@@ -359,12 +370,13 @@ void EcMaster::update(uint32_t domain)
     }
   }
 
-  struct timespec t;
-
-  clock_gettime(CLOCK_MONOTONIC, &t);
-  ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
-  ecrt_master_sync_reference_clock(master_);
-  ecrt_master_sync_slave_clocks(master_);
+  if (dc_used_) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
+    ecrt_master_sync_reference_clock(master_);
+    ecrt_master_sync_slave_clocks(master_);
+  }
 
   // send process data
   ecrt_domain_queue(domain_info->domain);
@@ -422,12 +434,13 @@ void EcMaster::writeData(uint32_t domain)
     }
   }
 
-  struct timespec t;
-
-  clock_gettime(CLOCK_MONOTONIC, &t);
-  ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
-  ecrt_master_sync_reference_clock(master_);
-  ecrt_master_sync_slave_clocks(master_);
+  if (dc_used_) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
+    ecrt_master_sync_reference_clock(master_);
+    ecrt_master_sync_slave_clocks(master_);
+  }
 
   // send process data
   ecrt_domain_queue(domain_info->domain);

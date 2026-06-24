@@ -82,6 +82,22 @@ public:
   /** Short human-readable readiness/status string for diagnostics/logging. */
   virtual std::string statusString() {return is_operational_ ? "operational" : "not-operational";}
 
+  // --- Deterministic group-barrier startup extensions ---
+  // (appended at the end of the class to preserve vtable/ABI compatibility)
+  /** Returns the current CiA402 device state as an integer (DeviceState enum
+   *  value) for drives, or -1 for slaves that are not CiA402 drives.
+   *  The driver uses this to coordinate a synchronous, group-wide power-up
+   *  ("barrier"): all drives must reach a given state before any of them is
+   *  commanded to advance to the next one. */
+  virtual int cia402State() {return -1;}
+  /** Enable/disable the startup barrier for this slave and set the highest
+   *  CiA402 state the slave is currently allowed to advance to.
+   *  While the barrier is enabled, a drive that already reached (or passed) the
+   *  target state must HOLD its control word instead of advancing further, so
+   *  the whole group steps through the state machine together.
+   *  Default: no-op (non-drive slaves ignore the barrier). */
+  virtual void setStartupBarrier(bool /*enabled*/, int /*target_state*/) {}
+
 public:
   inline
   void setAliasAndPosition(uint16_t alias, uint16_t position)

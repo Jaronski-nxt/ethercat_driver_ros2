@@ -514,6 +514,66 @@ CallbackReturn EthercatDriver::configNetwork()
     init_stable_cycles_ = 1;
   }
 
+  // Deterministic group-barrier startup mode (default barrier; set legacy to opt out)
+  if (info_.hardware_parameters.find("startup_mode") != info_.hardware_parameters.end()) {
+    const std::string mode = info_.hardware_parameters["startup_mode"];
+    if (mode == "barrier") {
+      startup_barrier_mode_ = true;
+    } else if (mode == "legacy") {
+      startup_barrier_mode_ = false;
+    } else {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"),
+        "Invalid startup_mode '%s' (expected 'legacy' or 'barrier')!", mode.c_str());
+      return CallbackReturn::ERROR;
+    }
+  }
+  if (info_.hardware_parameters.find("phase_timeout") != info_.hardware_parameters.end()) {
+    try {
+      phase_timeout_ = std::stod(info_.hardware_parameters["phase_timeout"]);
+    } catch (std::exception & e) {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"), "Invalid phase_timeout (%s)!", e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
+  if (info_.hardware_parameters.find("phase_stable_cycles") != info_.hardware_parameters.end()) {
+    try {
+      phase_stable_cycles_ = std::stoi(info_.hardware_parameters["phase_stable_cycles"]);
+    } catch (std::exception & e) {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"), "Invalid phase_stable_cycles (%s)!", e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
+  if (phase_stable_cycles_ < 1) {
+    phase_stable_cycles_ = 1;
+  }
+
+  // Runtime group-failfast supervision (default on; set false to opt out)
+  if (info_.hardware_parameters.find("runtime_drive_supervision") !=
+    info_.hardware_parameters.end())
+  {
+    const std::string v = info_.hardware_parameters["runtime_drive_supervision"];
+    runtime_drive_supervision_ = (v == "true" || v == "1" || v == "True");
+  }
+  if (info_.hardware_parameters.find("runtime_drive_fault_cycles") !=
+    info_.hardware_parameters.end())
+  {
+    try {
+      runtime_drive_fault_cycles_ =
+        std::stoi(info_.hardware_parameters["runtime_drive_fault_cycles"]);
+    } catch (std::exception & e) {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"),
+        "Invalid runtime_drive_fault_cycles (%s)!", e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
+  if (runtime_drive_fault_cycles_ < 1) {
+    runtime_drive_fault_cycles_ = 1;
+  }
+
   // start EC and wait until state operative
 
   master_->setCtrlFrequency(control_frequency_);
@@ -540,6 +600,152 @@ CallbackReturn EthercatDriver::configNetwork()
     }
   }
 
+  return CallbackReturn::SUCCESS;
+}
+
+namespace
+{
+// CiA402 DeviceState values mirrored from
+// ethercat_generic_plugins/cia402_common_defs.hpp. They MUST stay in sync with
+// that enum; cia402State() returns these integer values. Only the forward
+// power-up path is needed here.
+constexpr int kStateSwitchOnDisabled = 3;   // STATE_SWITCH_ON_DISABLED
+constexpr int kStateReadyToSwitchOn = 4;    // STATE_READY_TO_SWITCH_ON
+constexpr int kStateSwitchOn = 5;           // STATE_SWITCH_ON
+constexpr int kStateOperationEnabled = 6;   // STATE_OPERATION_ENABLED
+
+// Power-up rank for the group barrier; -1 means "not on the forward path".
+int cia402PowerupRank(int state)
+{
+  switch (state) {
+    case kStateSwitchOnDisabled: return 0;
+    case kStateReadyToSwitchOn:  return 1;
+    case kStateSwitchOn:         return 2;
+    case kStateOperationEnabled: return 3;
+    default:                     return -1;
+  }
+}
+}  // namespace
+
+CallbackReturn EthercatDriver::runBarrierStartup()
+{
+  // Ordered power-up targets the whole drive group steps through together.
+  // Phase 0 (SWITCH_ON_DISABLED) is the "wait for the whole bus" gate: every
+  // drive that becomes bus-OP is HELD at SWITCH_ON_DISABLED until the ENTIRE
+  // bus is OP (domain WC COMPLETE and every drive at least SWITCH_ON_DISABLED).
+  // Only then does the group advance — together — through READY_TO_SWITCH_ON,
+  // SWITCH_ON and OPERATION_ENABLED. Without phase 0 each drive raced to READY
+  // on its own as soon as it individually reached bus-OP (serial power-up).
+  const int phases[] = {
+    kStateSwitchOnDisabled, kStateReadyToSwitchOn, kStateSwitchOn, kStateOperationEnabled};
+  const char * phase_names[] = {
+    "SWITCH_ON_DISABLED", "READY_TO_SWITCH_ON", "SWITCH_ON", "OPERATION_ENABLED"};
+
+  RCLCPP_INFO(
+    rclcpp::get_logger("EthercatDriver"),
+    "Barrier startup: bringing all drives up together (phase_timeout=%.1fs, "
+    "stable_cycles=%d).", phase_timeout_, phase_stable_cycles_);
+
+  struct timespec t;
+  clock_gettime(CLOCK_MONOTONIC, &t);
+  t.tv_nsec += master_->getInterval();
+  while (t.tv_nsec >= 1000000000) {
+    t.tv_nsec -= 1000000000;
+    t.tv_sec++;
+  }
+
+  // Only Phase 0: hold all drives at SWITCH_ON_DISABLED until the bus is fully
+  // up (domain WC COMPLETE). After that, release the barrier and let each
+  // drive transition freely through CiA402 on its own. The lockstep phases 1–3
+  // have been removed because they caused spurious timeouts on serial bus
+  // bring-up and the drives are perfectly capable of self-transitioning.
+  for (size_t p = 0; p < 1; ++p) {
+    const int target = phases[p];
+    const int target_rank = cia402PowerupRank(target);
+    const double this_phase_timeout = init_timeout_;
+
+    // Arm the barrier on every drive for this phase target.
+    for (auto & module : ec_modules_) {
+      if (module->cia402State() >= 0) {
+        module->setStartupBarrier(true, target);
+      }
+    }
+
+    struct timespec t_phase_start;
+    clock_gettime(CLOCK_MONOTONIC, &t_phase_start);
+    int stable_cycles = 0;
+    bool phase_running = true;
+
+    while (phase_running) {
+      clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, NULL);
+      master_->update();
+
+      // The whole group must reach (or pass) the phase target with a healthy
+      // bus before we advance. Non-drive slaves (cia402State()<0) are ignored.
+      bool all_at_target = (master_->getDomainWcState(0) == EC_WC_COMPLETE);
+      for (auto & module : ec_modules_) {
+        const int st = module->cia402State();
+        if (st < 0) {continue;}
+        const int rank = cia402PowerupRank(st);
+        all_at_target = all_at_target && (rank >= 0) && (rank >= target_rank);
+      }
+
+      stable_cycles = all_at_target ? (stable_cycles + 1) : 0;
+      if (stable_cycles >= phase_stable_cycles_) {
+        phase_running = false;
+      }
+
+      struct timespec now;
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      double elapsed = (now.tv_sec - t_phase_start.tv_sec) +
+        (now.tv_nsec - t_phase_start.tv_nsec) * 1e-9;
+      if (phase_running && elapsed > this_phase_timeout) {
+        RCLCPP_ERROR(
+          rclcpp::get_logger("EthercatDriver"),
+          "Barrier startup TIMEOUT in phase '%s' after %.1f s (limit %.1f s). "
+          "Domain WC state: %u (need %u=COMPLETE). Drives not at target:",
+          phase_names[p], elapsed, this_phase_timeout,
+          master_->getDomainWcState(0), static_cast<unsigned int>(EC_WC_COMPLETE));
+        for (size_t i = 0; i < ec_modules_.size(); ++i) {
+          auto & module = ec_modules_[i];
+          const int st = module->cia402State();
+          if (st < 0) {continue;}
+          const int rank = cia402PowerupRank(st);
+          if (rank < 0 || rank < target_rank) {
+            RCLCPP_ERROR(
+              rclcpp::get_logger("EthercatDriver"),
+              "  Module %zu (alias %u, pos %u): %s",
+              i, module->alias_, module->position_, module->statusString().c_str());
+          }
+        }
+        // Disarm the barrier so deactivate()/error handling is unrestricted.
+        for (auto & module : ec_modules_) {
+          if (module->cia402State() >= 0) {
+            module->setStartupBarrier(false, kStateOperationEnabled);
+          }
+        }
+        return CallbackReturn::ERROR;
+      }
+
+      t.tv_nsec += master_->getInterval();
+      while (t.tv_nsec >= 1000000000) {
+        t.tv_nsec -= 1000000000;
+        t.tv_sec++;
+      }
+    }
+
+    RCLCPP_INFO(
+      rclcpp::get_logger("EthercatDriver"),
+      "Barrier startup: all drives reached '%s'.", phase_names[p]);
+  }
+
+  // Power-up complete — disarm the barrier so normal runtime control is fully
+  // unrestricted (and fault recovery can drive the state machine freely).
+  for (auto & module : ec_modules_) {
+    if (module->cia402State() >= 0) {
+      module->setStartupBarrier(false, kStateOperationEnabled);
+    }
+  }
   return CallbackReturn::SUCCESS;
 }
 
@@ -572,6 +778,16 @@ CallbackReturn EthercatDriver::on_activate(
     RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Configuring transfer network...");
     master_->registerTransferInDomain(ec_transfer_nets_);
     RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Transfer network configured!");
+  }
+
+  // Deterministic group-barrier power-up: bring ALL drives through the CiA402
+  // state machine together (no partial / per-drive enabling). Aborts hard if
+  // any drive cannot keep up in a phase. Runs before the final readiness gate.
+  if (startup_barrier_mode_) {
+    CallbackReturn barrier_result = runBarrierStartup();
+    if (barrier_result != CallbackReturn::SUCCESS) {
+      return barrier_result;
+    }
   }
 
   // Activation loop: wait until ALL modules are simultaneously fully ready
@@ -745,6 +961,47 @@ hardware_interface::return_type EthercatDriver::read(
         consecutive_wc_failures_, kMaxConsecutiveWcFailures, wc_state);
     } else {
       consecutive_wc_failures_ = 0;
+    }
+
+    // === SAFETY: Runtime group-failfast — one drive fails => whole arm stops ===
+    // If any CiA402 drive leaves OPERATION_ENABLED or loses a valid position
+    // during operation, the entire group must stop (no partial operation).
+    // Debounced over runtime_drive_fault_cycles_ to ignore single-cycle glitches.
+    if (runtime_drive_supervision_) {
+      int faulted_index = -1;
+      for (size_t i = 0; i < ec_modules_.size(); ++i) {
+        auto & module = ec_modules_[i];
+        if (module->cia402State() < 0) {continue;}  // non-drive slave
+        if (!(module->readyForCommands() && module->hasValidPosition())) {
+          faulted_index = static_cast<int>(i);
+          break;
+        }
+      }
+
+      if (faulted_index >= 0) {
+        consecutive_drive_failures_++;
+        auto & m = ec_modules_[faulted_index];
+        if (consecutive_drive_failures_ >= runtime_drive_fault_cycles_) {
+          RCLCPP_ERROR(
+            rclcpp::get_logger("EthercatDriver"),
+            "SAFETY: Drive (alias %u, pos %u) left ready state for %d cycles: %s "
+            "— stopping ALL drives (group failfast)!",
+            m->alias_, m->position_, consecutive_drive_failures_,
+            m->statusString().c_str());
+          activated_ = false;
+          consecutive_wc_failures_ = 0;
+          consecutive_drive_failures_ = 0;
+          master_->deactivate();
+          return hardware_interface::return_type::ERROR;
+        }
+        RCLCPP_WARN(
+          rclcpp::get_logger("EthercatDriver"),
+          "Drive (alias %u, pos %u) not ready %d/%d (%s).",
+          m->alias_, m->position_, consecutive_drive_failures_,
+          runtime_drive_fault_cycles_, m->statusString().c_str());
+      } else {
+        consecutive_drive_failures_ = 0;
+      }
     }
   }
   return hardware_interface::return_type::OK;

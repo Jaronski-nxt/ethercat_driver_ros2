@@ -91,6 +91,20 @@ void EcCiA402Drive::processData(size_t entry_idx, uint8_t * domain_address)
       channel.default_value = transition(
         state_,
         channel.ec_read(domain_address));
+
+      // Group-barrier: on the normal power-up path, do not advance past the
+      // currently allowed target state. A drive that already reached (or
+      // passed) the barrier target HOLDS its control word so the whole group
+      // steps through the CiA402 state machine together. Fault/quick-stop
+      // states are intentionally exempt: transition() still drives recovery.
+      if (barrier_enabled_) {
+        const int rank_now = cia402PowerupRank(state_);
+        const int rank_target = cia402PowerupRank(
+          static_cast<DeviceState>(barrier_target_state_));
+        if (rank_now >= 0 && rank_target >= 0 && rank_now >= rank_target) {
+          channel.default_value = channel.ec_read(domain_address);
+        }
+      }
     }
   }
 
@@ -227,6 +241,21 @@ bool EcCiA402Drive::setup_from_config_file(std::string config_file)
     return false;
   }
   return true;
+}
+
+/** Power-up path rank for the deterministic group barrier. Maps the normal
+ *  CiA402 power-up sequence to an ordered index; states that are not on the
+ *  forward power-up path (faults, quick-stop, undefined) return -1 so the
+ *  barrier never blocks fault handling. */
+int EcCiA402Drive::cia402PowerupRank(DeviceState state)
+{
+  switch (state) {
+    case STATE_SWITCH_ON_DISABLED:  return 0;
+    case STATE_READY_TO_SWITCH_ON:  return 1;
+    case STATE_SWITCH_ON:           return 2;
+    case STATE_OPERATION_ENABLED:   return 3;
+    default:                        return -1;
+  }
 }
 
 /** returns device state based upon the status_word */

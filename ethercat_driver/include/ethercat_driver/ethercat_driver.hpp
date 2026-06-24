@@ -148,6 +148,35 @@ protected:
   int consecutive_wc_failures_ = 0;
   std::atomic_bool shutdown_requested_{false};
 
+  // --- Deterministic group-barrier startup & runtime group failfast ---
+  /** Startup mode: false = legacy (per-drive auto transitions, unchanged
+   *  behaviour); true = deterministic group barrier where all drives advance
+   *  through the CiA402 power-up sequence together. Hardware parameter
+   *  "startup_mode" ("legacy"|"barrier"); default barrier. Set startup_mode
+   *  to "legacy" to opt out. */
+  bool startup_barrier_mode_ = true;
+  /** Maximum time (seconds) allowed for a single barrier phase before the
+   *  activation aborts. Hardware parameter "phase_timeout"; default 20 s. */
+  double phase_timeout_ = 20.0;
+  /** Number of consecutive cycles all drives must hold a barrier phase target
+   *  (with WC COMPLETE) before the group advances. Hardware parameter
+   *  "phase_stable_cycles"; default 20. */
+  int phase_stable_cycles_ = 20;
+  /** When true, read() supervises every CiA402 drive each cycle and triggers a
+   *  group stop if any drive leaves OPERATION_ENABLED / loses a valid position.
+   *  Hardware parameter "runtime_drive_supervision"; default true. Set to
+   *  "false" to opt out. */
+  bool runtime_drive_supervision_ = true;
+  /** Number of consecutive cycles a drive fault must persist before read()
+   *  triggers the group stop (debounces transient glitches). Hardware
+   *  parameter "runtime_drive_fault_cycles"; default 5. */
+  int runtime_drive_fault_cycles_ = 5;
+  int consecutive_drive_failures_ = 0;
+
+  /** Run the deterministic group-barrier power-up. Returns SUCCESS once all
+   *  drives reached OPERATION_ENABLED together, ERROR on phase timeout. */
+  CallbackReturn runBarrierStartup();
+
   /** Transfer nets */
   std::vector<ethercat_interface::EcTransferNet> ec_transfer_nets_;
 
