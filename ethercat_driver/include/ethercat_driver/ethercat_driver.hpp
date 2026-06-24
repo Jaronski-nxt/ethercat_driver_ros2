@@ -150,8 +150,8 @@ protected:
 
   // --- Deterministic group-barrier startup & runtime group failfast ---
   /** Startup mode: false = legacy (per-drive auto transitions, unchanged
-   *  behaviour); true = deterministic group barrier where all drives advance
-   *  through the CiA402 power-up sequence together. Hardware parameter
+   *  behaviour); true = deterministic phase-0 barrier where all drives are
+   *  held at SWITCH_ON_DISABLED until the whole bus is WC_COMPLETE. Hardware parameter
    *  "startup_mode" ("legacy"|"barrier"); default barrier. Set startup_mode
    *  to "legacy" to opt out. */
   bool startup_barrier_mode_ = true;
@@ -169,12 +169,12 @@ protected:
   bool runtime_drive_supervision_ = true;
   /** Number of consecutive cycles a drive fault must persist before read()
    *  triggers the group stop (debounces transient glitches). Hardware
-   *  parameter "runtime_drive_fault_cycles"; default 5. */
-  int runtime_drive_fault_cycles_ = 5;
+   *  parameter "runtime_drive_fault_cycles"; default 10. */
+  int runtime_drive_fault_cycles_ = 10;
   int consecutive_drive_failures_ = 0;
 
-  /** Run the deterministic group-barrier power-up. Returns SUCCESS once all
-   *  drives reached OPERATION_ENABLED together, ERROR on phase timeout. */
+  /** Run the deterministic startup gate. Returns SUCCESS once all drives are
+   *  synchronized at phase-0 (SWITCH_ON_DISABLED), ERROR on phase timeout. */
   CallbackReturn runBarrierStartup();
 
   /** Transfer nets */

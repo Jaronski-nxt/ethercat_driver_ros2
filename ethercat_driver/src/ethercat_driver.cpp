@@ -629,21 +629,19 @@ int cia402PowerupRank(int state)
 
 CallbackReturn EthercatDriver::runBarrierStartup()
 {
-  // Ordered power-up targets the whole drive group steps through together.
+  // Deterministic startup gate for phase 0.
   // Phase 0 (SWITCH_ON_DISABLED) is the "wait for the whole bus" gate: every
   // drive that becomes bus-OP is HELD at SWITCH_ON_DISABLED until the ENTIRE
   // bus is OP (domain WC COMPLETE and every drive at least SWITCH_ON_DISABLED).
-  // Only then does the group advance — together — through READY_TO_SWITCH_ON,
-  // SWITCH_ON and OPERATION_ENABLED. Without phase 0 each drive raced to READY
-  // on its own as soon as it individually reached bus-OP (serial power-up).
-  const int phases[] = {
-    kStateSwitchOnDisabled, kStateReadyToSwitchOn, kStateSwitchOn, kStateOperationEnabled};
-  const char * phase_names[] = {
-    "SWITCH_ON_DISABLED", "READY_TO_SWITCH_ON", "SWITCH_ON", "OPERATION_ENABLED"};
+  // Once this gate is released, each drive can continue its own CiA402
+  // transitions naturally. Without phase 0 each drive raced ahead as soon as
+  // it individually reached bus-OP (serial power-up).
+  const int phases[] = {kStateSwitchOnDisabled};
+  const char * phase_names[] = {"SWITCH_ON_DISABLED"};
 
   RCLCPP_INFO(
     rclcpp::get_logger("EthercatDriver"),
-    "Barrier startup: bringing all drives up together (phase_timeout=%.1fs, "
+    "Barrier startup: phase-0 bus gate (phase_timeout=%.1fs, "
     "stable_cycles=%d).", phase_timeout_, phase_stable_cycles_);
 
   struct timespec t;
@@ -662,7 +660,7 @@ CallbackReturn EthercatDriver::runBarrierStartup()
   for (size_t p = 0; p < 1; ++p) {
     const int target = phases[p];
     const int target_rank = cia402PowerupRank(target);
-    const double this_phase_timeout = init_timeout_;
+    const double this_phase_timeout = phase_timeout_;
 
     // Arm the barrier on every drive for this phase target.
     for (auto & module : ec_modules_) {
@@ -780,9 +778,9 @@ CallbackReturn EthercatDriver::on_activate(
     RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Transfer network configured!");
   }
 
-  // Deterministic group-barrier power-up: bring ALL drives through the CiA402
-  // state machine together (no partial / per-drive enabling). Aborts hard if
-  // any drive cannot keep up in a phase. Runs before the final readiness gate.
+  // Deterministic phase-0 startup gate: hold all drives at
+  // SWITCH_ON_DISABLED until the whole bus is ready (WC_COMPLETE).
+  // Runs before the final readiness gate.
   if (startup_barrier_mode_) {
     CallbackReturn barrier_result = runBarrierStartup();
     if (barrier_result != CallbackReturn::SUCCESS) {
