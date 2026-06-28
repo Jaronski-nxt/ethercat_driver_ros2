@@ -690,9 +690,13 @@ void EcMaster::registerTransferInDomain(const std::vector<EcTransferNet> & trans
 
 void EcMaster::transferAll()
 {
-  // Proceed to the transfer of all the data declared in transfers_.
   for (auto & transfer : transfers_) {
-    // Copy the data from the input to the output
+    if (transfer.in_ptr == nullptr || transfer.out_ptr == nullptr) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("EthercatDriver"),
+        "transferAll: null pointer in transfer entry, skipping (check transfer YAML config)");
+      continue;
+    }
     memcpy(transfer.out_ptr, transfer.in_ptr, transfer.size);
   }
 }

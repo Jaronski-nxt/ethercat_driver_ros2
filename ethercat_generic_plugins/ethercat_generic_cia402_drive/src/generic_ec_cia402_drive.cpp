@@ -61,7 +61,7 @@ void EcCiA402Drive::updateState()
   last_status_word_ = status_word_;
   last_state_ = state_;
   counter_++;
-  initialized_ = is_operational_;
+  initialized_ = is_operational_ && (state_ == STATE_OPERATION_ENABLED);
 }
 
 void EcCiA402Drive::processData(size_t entry_idx, uint8_t * domain_address)
@@ -75,13 +75,15 @@ void EcCiA402Drive::processData(size_t entry_idx, uint8_t * domain_address)
   // Special case: ControlWord
   if (channel.index == CiA402D_RPDO_CONTROLWORD) {
     if (fault_reset_command_interface_index_ >= 0) {
-      if (command_interface_ptr_->at(fault_reset_command_interface_index_) == 0) {
+      const double fr_cmd =
+        command_interface_ptr_->at(fault_reset_command_interface_index_);
+      // NaN == 0 is always false in IEEE 754 — must check isnan explicitly so
+      // a NaN command (controller deactivated) does not leave last_fault_reset_command_
+      // stuck at true, which would block all subsequent fault-reset edges.
+      if (std::isnan(fr_cmd) || fr_cmd == 0) {
         last_fault_reset_command_ = false;
       }
-      if (last_fault_reset_command_ == false &&
-        command_interface_ptr_->at(fault_reset_command_interface_index_) != 0 &&
-        !std::isnan(command_interface_ptr_->at(fault_reset_command_interface_index_)))
-      {
+      if (!last_fault_reset_command_ && !std::isnan(fr_cmd) && fr_cmd != 0) {
         last_fault_reset_command_ = true;
         fault_reset_ = true;
       }
@@ -98,8 +100,8 @@ void EcCiA402Drive::processData(size_t entry_idx, uint8_t * domain_address)
       // steps through the CiA402 state machine together. Fault/quick-stop
       // states are intentionally exempt: transition() still drives recovery.
       if (barrier_enabled_) {
-        const int rank_now = cia402PowerupRank(state_);
-        const int rank_target = cia402PowerupRank(
+        const int rank_now = powerupRankOf(state_);
+        const int rank_target = powerupRankOf(
           static_cast<DeviceState>(barrier_target_state_));
         if (rank_now >= 0 && rank_target >= 0 && rank_now >= rank_target) {
           channel.default_value = channel.ec_read(domain_address);
@@ -121,9 +123,12 @@ void EcCiA402Drive::processData(size_t entry_idx, uint8_t * domain_address)
         }
       }
       if (controller_active) {
-        // jt_controller AKTIV: original Logik, alles wie gehabt
-        channel.default_value =
-          channel.factor * last_position_ + channel.offset;
+        // Controller aktiv: default_value auf aktuelle Position setzen so dass
+        // bei einem NaN-Glitch des Controllers die Halteposition aktuell ist.
+        if (std::isfinite(last_position_)) {
+          channel.default_value =
+            channel.factor * last_position_ + channel.offset;
+        }
         // Flag zurücksetzen: wenn Controller wieder loslässt,
         // wird aktuelle Position neu gelatcht
         position_hold_initialized_ = false;
@@ -131,7 +136,7 @@ void EcCiA402Drive::processData(size_t entry_idx, uint8_t * domain_address)
       else {
         // jt_controller INAKTIV: Position einmal latchen und halten
         // Verhindert Drift durch Floating-Point Akkumulation bei 1000 Hz
-        if (!position_hold_initialized_) {
+        if (!position_hold_initialized_ && std::isfinite(last_position_)) {
           channel.default_value =
             channel.factor * last_position_ + channel.offset;
           position_hold_initialized_ = true;
@@ -247,7 +252,7 @@ bool EcCiA402Drive::setup_from_config_file(std::string config_file)
  *  CiA402 power-up sequence to an ordered index; states that are not on the
  *  forward power-up path (faults, quick-stop, undefined) return -1 so the
  *  barrier never blocks fault handling. */
-int EcCiA402Drive::cia402PowerupRank(DeviceState state)
+int EcCiA402Drive::powerupRankOf(DeviceState state)
 {
   switch (state) {
     case STATE_SWITCH_ON_DISABLED:  return 0;

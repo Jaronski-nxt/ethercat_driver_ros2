@@ -62,6 +62,9 @@ public:
   // --- Deterministic group-barrier startup ---
   /** Current CiA402 device state as int (DeviceState), for group coordination. */
   int cia402State() override {return static_cast<int>(state_);}
+  /** Power-up rank of the current state (0=SWITCH_ON_DISABLED … 3=OPERATION_ENABLED),
+   *  -1 for fault/quick-stop/undefined. Used by driver for group barrier coordination. */
+  int cia402PowerupRank() const override {return powerupRankOf(state_);}
   /** Enable/disable barrier and set the highest CiA402 state this drive may
    *  advance to during the coordinated power-up. */
   void setStartupBarrier(bool enabled, int target_state) override
@@ -96,9 +99,8 @@ protected:
 
   /** returns device state based upon the status_word */
   DeviceState deviceState(uint16_t status_word);
-  /** power-up path rank used by the deterministic group barrier (-1 if the
-   *  state is not on the forward power-up path). */
-  static int cia402PowerupRank(DeviceState state);
+  /** power-up path rank for a given state (-1 if not on the forward power-up path). */
+  static int powerupRankOf(DeviceState state);
   /** returns the control word that will take device from state to next desired state */
   uint16_t transition(DeviceState state, uint16_t control_word);
   /** set up of the drive configuration from yaml node*/

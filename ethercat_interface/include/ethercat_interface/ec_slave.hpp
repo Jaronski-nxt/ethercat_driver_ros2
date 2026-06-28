@@ -90,6 +90,11 @@ public:
    *  ("barrier"): all drives must reach a given state before any of them is
    *  commanded to advance to the next one. */
   virtual int cia402State() {return -1;}
+  /** Returns the power-up rank of the drive's current CiA402 state on the
+   *  normal SWITCH_ON_DISABLED → READY_TO_SWITCH_ON → SWITCH_ON →
+   *  OPERATION_ENABLED path (0, 1, 2, 3 respectively).
+   *  Returns -1 for non-drive slaves, faults, or undefined states. */
+  virtual int cia402PowerupRank() const {return -1;}
   /** Enable/disable the startup barrier for this slave and set the highest
    *  CiA402 state the slave is currently allowed to advance to.
    *  While the barrier is enabled, a drive that already reached (or passed) the

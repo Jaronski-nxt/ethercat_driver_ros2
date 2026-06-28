@@ -273,12 +273,8 @@ CallbackReturn EthercatDriver::on_init(
     auto transfer_module_params = getEcTransferModuleParam(config);
 
     // Append the transfer modules parameters to the list of modules parameters
-    size_t idx_1st = ec_module_parameters_.size();
     ec_module_parameters_.insert(
       ec_module_parameters_.end(), transfer_module_params.begin(), transfer_module_params.end());
-    for (size_t i = 0; i < transfer_module_params.size(); i++) {
-      ec_transfer_slaves_.push_back(idx_1st + i);
-    }
 
     // Parse transfer nets from the transfer yaml file
     ec_transfer_nets_ = getEcTransferNets(config);
@@ -573,6 +569,18 @@ CallbackReturn EthercatDriver::configNetwork()
   if (runtime_drive_fault_cycles_ < 1) {
     runtime_drive_fault_cycles_ = 1;
   }
+  if (info_.hardware_parameters.find("max_wc_failures") != info_.hardware_parameters.end()) {
+    try {
+      kMaxConsecutiveWcFailures_ = std::stoi(info_.hardware_parameters["max_wc_failures"]);
+    } catch (std::exception & e) {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"), "Invalid max_wc_failures (%s)!", e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
+  if (kMaxConsecutiveWcFailures_ < 1) {
+    kMaxConsecutiveWcFailures_ = 1;
+  }
 
   // start EC and wait until state operative
 
@@ -587,45 +595,21 @@ CallbackReturn EthercatDriver::configNetwork()
     for (auto & sdo : ec_modules_[i]->sdo_config) {
       uint32_t abort_code;
       int ret = master_->configSlaveSdo(
-        std::stod(ec_module_parameters_[i]["position"]),
+        std::stoul(ec_module_parameters_[i]["position"]),
         sdo,
         &abort_code);
       if (ret) {
-        RCLCPP_INFO(
+        RCLCPP_ERROR(
           rclcpp::get_logger("EthercatDriver"),
-          "Failed to download config SDO for module at position %s with Error: %d",
+          "Failed to download SDO for module at position %s: ret=%d abort_code=0x%08X",
           ec_module_parameters_[i]["position"].c_str(),
-          abort_code);
+          ret, abort_code);
       }
     }
   }
 
   return CallbackReturn::SUCCESS;
 }
-
-namespace
-{
-// CiA402 DeviceState values mirrored from
-// ethercat_generic_plugins/cia402_common_defs.hpp. They MUST stay in sync with
-// that enum; cia402State() returns these integer values. Only the forward
-// power-up path is needed here.
-constexpr int kStateSwitchOnDisabled = 3;   // STATE_SWITCH_ON_DISABLED
-constexpr int kStateReadyToSwitchOn = 4;    // STATE_READY_TO_SWITCH_ON
-constexpr int kStateSwitchOn = 5;           // STATE_SWITCH_ON
-constexpr int kStateOperationEnabled = 6;   // STATE_OPERATION_ENABLED
-
-// Power-up rank for the group barrier; -1 means "not on the forward path".
-int cia402PowerupRank(int state)
-{
-  switch (state) {
-    case kStateSwitchOnDisabled: return 0;
-    case kStateReadyToSwitchOn:  return 1;
-    case kStateSwitchOn:         return 2;
-    case kStateOperationEnabled: return 3;
-    default:                     return -1;
-  }
-}
-}  // namespace
 
 CallbackReturn EthercatDriver::runBarrierStartup()
 {
@@ -636,6 +620,7 @@ CallbackReturn EthercatDriver::runBarrierStartup()
   // Once this gate is released, each drive can continue its own CiA402
   // transitions naturally. Without phase 0 each drive raced ahead as soon as
   // it individually reached bus-OP (serial power-up).
+  constexpr int kStateSwitchOnDisabled = 3;  // DeviceState enum value
   const int phases[] = {kStateSwitchOnDisabled};
   const char * phase_names[] = {"SWITCH_ON_DISABLED"};
 
@@ -652,14 +637,12 @@ CallbackReturn EthercatDriver::runBarrierStartup()
     t.tv_sec++;
   }
 
-  // Only Phase 0: hold all drives at SWITCH_ON_DISABLED until the bus is fully
-  // up (domain WC COMPLETE). After that, release the barrier and let each
-  // drive transition freely through CiA402 on its own. The lockstep phases 1–3
-  // have been removed because they caused spurious timeouts on serial bus
-  // bring-up and the drives are perfectly capable of self-transitioning.
+  // Phase 0: hold all drives at SWITCH_ON_DISABLED until the bus is fully up
+  // (domain WC COMPLETE). After that, release the barrier and let each drive
+  // transition freely through CiA402 on its own.
+  constexpr int target_rank = 0;  // rank of SWITCH_ON_DISABLED on the power-up path
   for (size_t p = 0; p < 1; ++p) {
     const int target = phases[p];
-    const int target_rank = cia402PowerupRank(target);
     const double this_phase_timeout = phase_timeout_;
 
     // Arm the barrier on every drive for this phase target.
@@ -682,9 +665,8 @@ CallbackReturn EthercatDriver::runBarrierStartup()
       // bus before we advance. Non-drive slaves (cia402State()<0) are ignored.
       bool all_at_target = (master_->getDomainWcState(0) == EC_WC_COMPLETE);
       for (auto & module : ec_modules_) {
-        const int st = module->cia402State();
-        if (st < 0) {continue;}
-        const int rank = cia402PowerupRank(st);
+        if (module->cia402State() < 0) {continue;}  // non-drive slave
+        const int rank = module->cia402PowerupRank();
         all_at_target = all_at_target && (rank >= 0) && (rank >= target_rank);
       }
 
@@ -706,9 +688,8 @@ CallbackReturn EthercatDriver::runBarrierStartup()
           master_->getDomainWcState(0), static_cast<unsigned int>(EC_WC_COMPLETE));
         for (size_t i = 0; i < ec_modules_.size(); ++i) {
           auto & module = ec_modules_[i];
-          const int st = module->cia402State();
-          if (st < 0) {continue;}
-          const int rank = cia402PowerupRank(st);
+          if (module->cia402State() < 0) {continue;}
+          const int rank = module->cia402PowerupRank();
           if (rank < 0 || rank < target_rank) {
             RCLCPP_ERROR(
               rclcpp::get_logger("EthercatDriver"),
@@ -719,7 +700,7 @@ CallbackReturn EthercatDriver::runBarrierStartup()
         // Disarm the barrier so deactivate()/error handling is unrestricted.
         for (auto & module : ec_modules_) {
           if (module->cia402State() >= 0) {
-            module->setStartupBarrier(false, kStateOperationEnabled);
+            module->setStartupBarrier(false, 0);  // target unused when disarming
           }
         }
         return CallbackReturn::ERROR;
@@ -741,7 +722,7 @@ CallbackReturn EthercatDriver::runBarrierStartup()
   // unrestricted (and fault recovery can drive the state machine freely).
   for (auto & module : ec_modules_) {
     if (module->cia402State() >= 0) {
-      module->setStartupBarrier(false, kStateOperationEnabled);
+      module->setStartupBarrier(false, 0);  // target unused when disarming
     }
   }
   return CallbackReturn::SUCCESS;
@@ -755,7 +736,10 @@ CallbackReturn EthercatDriver::on_activate(
     RCLCPP_FATAL(rclcpp::get_logger("EthercatDriver"), "Double on_activate()");
     return CallbackReturn::ERROR;
   }
-  RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Starting ...please wait...");
+  RCLCPP_INFO(
+    rclcpp::get_logger("EthercatDriver"),
+    "Starting ...please wait... (max %.0f s barrier + %.0f s init = %.0f s total)",
+    phase_timeout_, init_timeout_, phase_timeout_ + init_timeout_);
 
   // Reset WC error counter
   consecutive_wc_failures_ = 0;
@@ -816,7 +800,6 @@ CallbackReturn EthercatDriver::on_activate(
     bool allReady = (master_->getDomainWcState(0) == EC_WC_COMPLETE);
     for (auto & module : ec_modules_) {
       allReady = allReady &&
-        module->initialized() &&
         module->readyForCommands() &&
         module->hasValidPosition();
     }
@@ -840,8 +823,7 @@ CallbackReturn EthercatDriver::on_activate(
         elapsed, init_timeout_, wc, static_cast<unsigned int>(EC_WC_COMPLETE));
       for (size_t i = 0; i < ec_modules_.size(); ++i) {
         auto & module = ec_modules_[i];
-        bool ok = module->initialized() &&
-          module->readyForCommands() &&
+        bool ok = module->readyForCommands() &&
           module->hasValidPosition();
         if (!ok) {
           RCLCPP_ERROR(
@@ -946,7 +928,7 @@ hardware_interface::return_type EthercatDriver::read(
     unsigned int wc_state = master_->getDomainWcState(0);
     if (wc_state != EC_WC_COMPLETE) {
       consecutive_wc_failures_++;
-      if (consecutive_wc_failures_ >= kMaxConsecutiveWcFailures) {
+      if (consecutive_wc_failures_ >= kMaxConsecutiveWcFailures_) {
         RCLCPP_ERROR(
           rclcpp::get_logger("EthercatDriver"),
           "SAFETY: Domain WC not COMPLETE for %d consecutive cycles (last state=%u) — returning ERROR!",
@@ -956,7 +938,7 @@ hardware_interface::return_type EthercatDriver::read(
       RCLCPP_WARN(
         rclcpp::get_logger("EthercatDriver"),
         "Domain WC transient fault %d/%d (state=%u).",
-        consecutive_wc_failures_, kMaxConsecutiveWcFailures, wc_state);
+        consecutive_wc_failures_, kMaxConsecutiveWcFailures_, wc_state);
     } else {
       consecutive_wc_failures_ = 0;
     }

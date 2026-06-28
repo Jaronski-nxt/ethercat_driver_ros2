@@ -143,8 +143,9 @@ protected:
   std::mutex ec_mutex_;
   bool activated_;
 
-  // Safety: tolerate short WC glitches, fail only on persistent non-COMPLETE domain state
-  static constexpr int kMaxConsecutiveWcFailures = 5;
+  // Safety: tolerate short WC glitches, fail only on persistent non-COMPLETE domain state.
+  // Configurable via hardware parameter "max_wc_failures"; default 5.
+  int kMaxConsecutiveWcFailures_ = 5;
   int consecutive_wc_failures_ = 0;
   std::atomic_bool shutdown_requested_{false};
 
@@ -160,8 +161,8 @@ protected:
   double phase_timeout_ = 20.0;
   /** Number of consecutive cycles all drives must hold a barrier phase target
    *  (with WC COMPLETE) before the group advances. Hardware parameter
-   *  "phase_stable_cycles"; default 20. */
-  int phase_stable_cycles_ = 20;
+   *  "phase_stable_cycles"; default 10. */
+  int phase_stable_cycles_ = 10;
   /** When true, read() supervises every CiA402 drive each cycle and triggers a
    *  group stop if any drive leaves OPERATION_ENABLED / loses a valid position.
    *  Hardware parameter "runtime_drive_supervision"; default true. Set to
