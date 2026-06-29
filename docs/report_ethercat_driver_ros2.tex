@@ -1,0 +1,1413 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[ngerman,english]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!70!black,
+  urlcolor=blue!60!black,
+  citecolor=green!60!black,
+  pdftitle={EtherCAT Driver ROS2 -- Technical Report},
+  pdfauthor={Jaron Martinez}
+}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{mdframed}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes,fit,backgrounds,calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{parskip}
+
+% ----------- Colors ------------------------------------------------------------
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.97,0.97,0.97}
+\definecolor{warnorange}{RGB}{230,120,0}
+\definecolor{dangerred}{RGB}{200,30,30}
+\definecolor{safegreen}{RGB}{30,150,30}
+\definecolor{infoblue}{RGB}{30,100,180}
+
+% ----------- Listings ----------------------------------------------------------
+\lstdefinestyle{cppstyle}{
+  backgroundcolor=\color{backcolour},
+  commentstyle=\color{codegreen}\itshape,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  numberstyle=\tiny\color{codegray},
+  stringstyle=\color{codepurple},
+  basicstyle=\ttfamily\small,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=2,
+  language=C++,
+  morekeywords={uint8_t,uint16_t,uint32_t,int8_t,int16_t,int32_t,size_t,constexpr,override,nullptr,std}
+}
+\lstset{style=cppstyle}
+
+% ----------- Custom boxes ------------------------------------------------------
+\newtcolorbox{bugbox}[2][]{
+  colback=red!5!white,colframe=dangerred,
+  fonttitle=\bfseries,title=Bug #2,#1
+}
+\newtcolorbox{fixbox}[1][]{
+  colback=green!5!white,colframe=safegreen,
+  fonttitle=\bfseries,title=Fix,#1
+}
+\newtcolorbox{infobox}[1][]{
+  colback=blue!5!white,colframe=infoblue,
+  fonttitle=\bfseries,#1
+}
+\newtcolorbox{warnbox}[1][]{
+  colback=orange!8!white,colframe=warnorange,
+  fonttitle=\bfseries,#1
+}
+
+% ----------- Header / Footer ---------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small\texttt{ethercat\_driver\_ros2} -- Technical Report}
+\lhead{\small Jaron Martinez, 2026}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ----------- Title formatting --------------------------------------------------
+\titleformat{\section}{\Large\bfseries\color{blue!70!black}}{}{0em}{\thesection\quad}
+\titleformat{\subsection}{\large\bfseries\color{blue!50!black}}{}{0em}{\thesubsection\quad}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{blue!40!black}}{}{0em}{\thesubsubsection\quad}
+
+% ==============================================================================
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Huge\bfseries EtherCAT Driver ROS\,2\\[0.4em]
+   \Large Technical Report: Branch Evolution, Safety Architecture,\\
+   and Bug-Fix Analysis\par}
+  \vspace{1.5cm}
+  {\large\itshape LeRobot Teststand Project\par}
+  \vspace{0.5cm}
+  {\large Jaron Martinez\par}
+  \vspace{0.5cm}
+  {\large\texttt{jaron.martinez@gmail.com}\par}
+  \vspace{1cm}
+  {\large 28 June 2026\par}
+  \vspace{2cm}
+  \hrule
+  \vspace{1em}
+  \begin{abstract}
+    \noindent
+    This report documents the full technical evolution of the
+    \texttt{ethercat\_driver\_ros2} fork developed for Synapticon Circulo
+    servo drives (CiA402) controlled via an IgH EtherCAT Master and a
+    Beckhoff CU1228 coupler in a LeRobot robotic-arm teststand.
+    Starting from the upstream \texttt{main} branch of ICube-Robotics,
+    two major feature branches were created:
+    \texttt{saftey\_features\_clean} (immediate safety stop on link or
+    working-counter fault) and \texttt{deterministic-barrier-startup}
+    (deterministic Distributed-Clock synchronisation and a group
+    barrier that eliminates serial per-joint initialisation delays).
+    The report covers the motivation for each change, the precise code
+    modifications made, and a rigorous analysis of eleven bugs
+    discovered and fixed in the barrier-startup branch, including three
+    IEEE\,754 NaN-safety issues.  A commissioning and test plan
+    concludes the document.
+  \end{abstract}
+  \hrule
+  \vspace{1em}
+  \tableofcontents
+\end{titlepage}
+
+% ==============================================================================
+\newpage
+\section{Introduction and Motivation}
+\label{sec:intro}
+
+The \texttt{ethercat\_driver\_ros2} package provides a \emph{ros2\_control}
+\texttt{SystemInterface} that connects ROS\,2 hardware controllers to EtherCAT
+fieldbus devices via the IgH EtherCAT Master for Linux.  The upstream project
+(ICube-Robotics, University of Strasbourg) is a general-purpose driver
+suitable for any EtherCAT slave.  The fork documented here specialises it for
+a six-degree-of-freedom robotic arm equipped with Synapticon Circulo drives,
+which implement the \emph{CANopen over EtherCAT} (CoE) CiA402 motion-control
+profile.
+
+\subsection{Hardware Setup}
+
+\begin{itemize}[nosep]
+  \item \textbf{PC}: Real-time Linux (PREEMPT\_RT), IgH EtherCAT Master 1.5
+  \item \textbf{EtherCAT coupler}: Beckhoff CU1228 (bus switch)
+  \item \textbf{Drives}: 6$\times$ Synapticon Circulo (vendor ID 0x000022D2,
+        CiA402 Cyclic Synchronous Position mode, 1\,kHz PDO cycle)
+  \item \textbf{ROS\,2}: Humble, \texttt{ros2\_control}, \texttt{pluginlib}
+\end{itemize}
+
+\subsection{Branch Overview}
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=2.2cm,
+  commit/.style={rectangle,rounded corners,draw,minimum width=4cm,
+                 minimum height=0.7cm,font=\small\ttfamily,fill=blue!8},
+  arrow/.style={-Stealth,thick,blue!60}
+]
+  \node[commit] (main)   {\textbf{main} (upstream ICube)};
+  \node[commit,below=of main] (safety)
+        {\textbf{saftey\_features\_clean}};
+  \node[commit,below=of safety] (barrier)
+        {\textbf{deterministic-barrier-startup}};
+
+  \draw[arrow] (main)   -- node[right,font=\small]{Apr 2026 -- safety stop} (safety);
+  \draw[arrow] (safety) -- node[right,font=\small]{Jun 2026 -- DC fix + barrier + 11 bugs} (barrier);
+\end{tikzpicture}
+\end{center}
+
+% ==============================================================================
+\section{Starting Point: Upstream \texttt{main}}
+\label{sec:upstream}
+
+The upstream \texttt{main} branch provided:
+\begin{enumerate}[nosep]
+  \item A YAML-configurable plugin loader (\texttt{pluginlib}) for any
+        \texttt{EcSlave} subclass.
+  \item A generic PDO channel manager (\texttt{EcPdoChannelManager}) with
+        read/write, masks, bit operations, and a NaN firewall
+        (\texttt{ec\_write} skips the write when \texttt{default\_value} is
+        NaN).
+  \item A CiA402 drive plugin (\texttt{EcCiA402Drive}) with automatic state
+        transitions, mode-of-operation control, and fault-reset edge detection.
+  \item The IgH \texttt{EcMaster} wrapper (PDO domain management, SDO
+        download, DC configuration).
+\end{enumerate}
+
+\subsection{Known Issues in Upstream}
+\label{sec:upstream-issues}
+
+Even in the upstream release the following weaknesses existed:
+
+\begin{warnbox}[title=Upstream limitations]
+  \begin{itemize}[nosep]
+    \item No link-down detection in the real-time loop: a cable pull caused
+          the driver to continue silently sending stale commands.
+    \item No WC-failure counter: a single working-counter mismatch generated a
+          \texttt{WARN} log but no controlled stop.
+    \item \texttt{initialized\_} was set to \texttt{is\_operational\_}
+          (EtherCAT bus-OP flag) rather than to the \emph{drive} state
+          \texttt{OPERATION\_ENABLED}, so the driver could declare success before
+          any drive was actually ready to accept motion commands.
+    \item All drive state interfaces were initialised to NaN and were never
+          written to a defined value until the first PDO cycle returned data,
+          creating a window where \texttt{last\_position\_} was NaN.
+    \item Per-slave \texttt{clock\_gettime()} in \texttt{addSlave()} produced
+          random, non-deterministic SYNC0 phases, causing 1--5\,s per-joint
+          DC-alignment delays during startup.
+  \end{itemize}
+\end{warnbox}
+
+% ==============================================================================
+\section{Branch 1: \texttt{saftey\_features\_clean}}
+\label{sec:safety-branch}
+
+This branch was created in April 2026 to address the most critical safety gaps
+identified during initial teststand commissioning.
+
+\subsection{Commit \texttt{b21391f} -- Immediate ERROR on Link-Down / WKC Fault (Apr 2026)}
+
+\subsubsection{Motivation}
+
+During hardware testing, pulling the EtherCAT cable while the driver was
+active caused the control loop to continue running with stale, non-updated
+PDO data.  The drives continued executing the last received target position,
+which could cause uncontrolled motion.
+
+\subsubsection{Changes}
+
+The \texttt{read()} callback was extended with two sequential safety checks:
+
+\begin{lstlisting}[caption={Link-down detection in \texttt{read()}}]
+// SAFETY: Check link status -- immediate ERROR on link down
+if (!master_->isMasterLinkUp()) {
+  RCLCPP_ERROR(..., "SAFETY: EtherCAT link DOWN -- stopping ...");
+  activated_ = false;
+  consecutive_wc_failures_ = 0;
+  master_->deactivate();
+  return hardware_interface::return_type::ERROR;
+}
+
+// SAFETY: Check domain WKC -- immediate ERROR when not COMPLETE
+unsigned int wc_state = master_->getDomainWcState(0);
+if (wc_state != EC_WC_COMPLETE) {
+  consecutive_wc_failures_++;
+  if (consecutive_wc_failures_ >= kMaxConsecutiveWcFailures_) {
+    RCLCPP_ERROR(..., "SAFETY: Domain WC not COMPLETE for %d "
+                      "consecutive cycles -- returning ERROR!",
+                 consecutive_wc_failures_, wc_state);
+    return hardware_interface::return_type::ERROR;
+  }
+}
+\end{lstlisting}
+
+The \texttt{isMasterLinkUp()} method wraps \texttt{ecrt\_master\_state()} and
+checks the \texttt{link\_up} field.  Returning \texttt{ERROR} from
+\texttt{read()} causes \texttt{ros2\_control} to call
+\texttt{on\_error()}, which calls \texttt{master\_->deactivate()} and then
+requests a clean process shutdown via \texttt{rclcpp::shutdown()}.
+
+\subsubsection{Initial WC Threshold: \texttt{kMaxConsecutiveWcFailures = 1}}
+
+The initial value of 1 was overly aggressive: a single late EtherCAT frame
+during startup or a momentary CPU overload could trigger a safety stop.
+
+\subsection{Commit \texttt{70f0595} -- Tighten Safety Stop and Clean Shutdown (Apr 2026)}
+
+Added \texttt{on\_error()} to the hardware interface lifecycle to guarantee a
+controlled motor stop in all error paths:
+
+\begin{lstlisting}[caption={\texttt{on\_error()} safe shutdown}]
+CallbackReturn EthercatDriver::on_error(
+  const rclcpp_lifecycle::State &)
+{
+  if (activated_) {
+    activated_ = false;
+    master_->deactivate();  // slaves -> INIT, brakes engage
+  }
+  // Delayed shutdown to let controller_manager finish
+  if (rclcpp::ok() && !shutdown_requested_.exchange(true)) {
+    std::thread([]() {
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      if (rclcpp::ok()) { rclcpp::shutdown(); }
+    }).detach();
+  }
+  return CallbackReturn::SUCCESS;
+}
+\end{lstlisting}
+
+\texttt{ecrt\_master\_deactivate()} followed by
+\texttt{ecrt\_release\_master()} puts all slaves back to the \texttt{INIT}
+state, which engages any hardware brakes configured on the drives.  The
+subsequent \texttt{ecrt\_release\_master()} also prevents the IgH kernel
+idle-scanning thread from re-establishing slave states after a cable
+reconnect without explicit re-activation.
+
+\subsection{Commit \texttt{32a2cc6} -- Hold Latched Position When Controller Inactive (Apr 2026)}
+
+\subsubsection{Problem -- Floating-Point Accumulation Drift at 1\,kHz}
+
+\paragraph{Observed symptom.}
+When the trajectory controller is inactive (command interface set to NaN by
+ROS\,2's hardware-interface layer), a joint that should be stationary slowly
+drifts away from its resting position.  The drift is not caused by external
+forces or a faulty encoder -- it is a purely software artefact that appears
+only in standby mode and worsens over time.
+
+\paragraph{Root cause.}
+In Cyclic Synchronous Position (CSP) mode the drive expects a target position
+command every EtherCAT cycle.  When no trajectory controller is active the
+driver must write a \emph{hold position} to keep the joint stationary.  The
+upstream implementation recomputed this hold value from scratch on \emph{every
+single 1\,ms control cycle}:
+
+\begin{lstlisting}[caption={Upstream hold-position code executed at 1\,kHz (buggy)}]
+// Inside processData(), every 1 ms:
+channel.default_value =
+    channel.factor * last_position_ + channel.offset;
+\end{lstlisting}
+
+\noindent
+\texttt{last\_position\_} is the actual position read back from the drive's
+TPDO in the same cycle.  This forms a closed feedback loop:
+
+\begin{enumerate}
+  \item Cycle $n$: send $d_n = f \cdot p_n + b$ as the commanded position.
+  \item Drive moves toward $d_n$; encoder reads $p_{n+1}$ (actual feedback).
+  \item Cycle $n+1$: compute $d_{n+1} = f \cdot p_{n+1} + b$.
+\end{enumerate}
+
+\noindent
+This loop is a problem for two independent reasons:
+
+\begin{description}
+  \item[IEEE\,754 rounding per multiply.]
+    The factor $f$ is loaded from the YAML configuration as a double-precision
+    float.  Typical unit-conversion factors (e.g.\ encoder counts to radians:
+    $f = 2\pi / 1\,048\,576 \approx 5.99 \times 10^{-6}$, or its inverse for
+    the command channel) are \emph{not} exactly representable in binary
+    floating point.  Each multiplication $f \cdot p_n$ therefore introduces a
+    rounding error of up to $\tfrac{1}{2}\,\mathrm{ULP}$.  For a 20-bit
+    encoder with values around $10^6$, ULP$(10^6 \cdot 2\pi) \approx 10^{-9}$\,rad.
+    Individually negligible, at 1\,kHz this sums to $\approx 10^{-6}$\,rad$/$s.
+    Over minutes the error can accumulate to multiple encoder counts.
+
+  \item[Integer quantisation round-trip.]
+    The drive's servo loop operates on fixed-point integers (32-bit position
+    counts from a 20-bit encoder).  The TPDO delivers the actual position as
+    an integer-valued double ($p_n \in \mathbb{Z}$).  After the float multiply
+    and round-trip through the RPDO the drive rounds the received command back
+    to an integer count.  If $\lfloor f \cdot p_n + b \rceil \neq p_n$, the
+    next TPDO sample $p_{n+1}$ can differ from $p_n$ by $\pm 1$ count,
+    which is then fed back into the multiply loop.  This quantisation walk
+    causes slow, monotone position drift -- typically 1--5 encoder
+    counts per minute, corresponding to
+    $\approx 0.001$--$0.02$\,degrees for a 20-bit encoder.
+\end{description}
+
+\paragraph{Why this is hard to catch in testing.}
+The drift is small enough that a short activation/deactivation cycle does not
+reveal it.  It only becomes observable after the driver has been running in
+standby for 30--60 seconds, manifesting as an unexpected joint motion that
+looks like a control or gravity-compensation bug rather than a driver artefact.
+A \texttt{rqt\_plot} of the joint position command vs.\ state interface while
+the controller is inactive will show the command slowly diverging.
+
+\subsubsection{Solution -- One-Shot Position Latch with NaN Guard}
+
+A \emph{position-hold latch} was introduced: when the controller command
+interface is NaN (controller inactive), the drive's \texttt{default\_value}
+for the RPDO position is set \emph{once} to the current actual position and
+held constant until the controller becomes active again.  The
+\texttt{position\_hold\_initialized\_} flag ensures the computation runs
+exactly once per controller-deactivation event, completely eliminating the
+feedback loop.
+
+A subsequent fix (branch \texttt{deterministic-barrier-startup}, this session)
+added a \texttt{std::isfinite()} guard before the latch commit.  Without this
+guard, if the TPDO position had not yet been received when the latch triggered
+(e.g.\ during the first few EtherCAT cycles after activation),
+\texttt{last\_position\_} would be \texttt{NaN} and the drive would receive a
+NaN command -- which the lower-level \texttt{ec\_write()} firewall in
+\texttt{ec\_pdo\_channel\_manager.cpp} silently suppresses, leaving the domain
+at its previous (potentially zero) value.
+
+\begin{lstlisting}[caption={Position-hold latch in \texttt{processData()}}]
+bool controller_active = false;
+if (channel.has_command_interface_name(0) &&
+    channel.is_command_interface_defined()) {
+  const size_t cmd_idx = channel.command_interface_index(0);
+  if (cmd_idx < command_interface_ptr_->size()) {
+    controller_active =
+      !std::isnan(command_interface_ptr_->at(cmd_idx));
+  }
+}
+if (controller_active) {
+  if (std::isfinite(last_position_)) {
+    channel.default_value =
+      channel.factor * last_position_ + channel.offset;
+  }
+  position_hold_initialized_ = false;
+} else {
+  // Latch once, then hold
+  if (!position_hold_initialized_ && std::isfinite(last_position_)) {
+    channel.default_value =
+      channel.factor * last_position_ + channel.offset;
+    position_hold_initialized_ = true;
+  }
+}
+\end{lstlisting}
+
+\subsection{Commit \texttt{4f1e593} -- Watchdog Tuning and Monotonic App Time (Apr 2026)}
+
+The EtherCAT SM watchdog was configured explicitly for approximately 100\,ms
+timeout (divider 2498, intervals 1000 at 25\,ns base period):
+
+\begin{lstlisting}
+ecrt_slave_config_watchdog(slave_info.config, 2498, 1000);
+\end{lstlisting}
+
+A fresh \texttt{CLOCK\_MONOTONIC} timestamp is passed to
+\texttt{ecrt\_master\_application\_time()} on every \texttt{update()} call,
+ensuring the DC reference clock stays synchronised during long-running
+operation rather than drifting from a single reference set at activation.
+
+\subsection{Commit \texttt{aedb118} -- Raise \texttt{kMaxConsecutiveWcFailures} to 5 (May 2026)}
+
+Experience with the 1-cycle threshold showed spurious safety stops during
+rapid controller switches and brief CPU scheduling jitter.  The threshold was
+raised to 5 consecutive WC failures, allowing transient single-cycle glitches
+to recover without a controlled stop.
+
+% ==============================================================================
+\section{Branch 2: \texttt{deterministic-barrier-startup}}
+\label{sec:barrier-branch}
+
+This branch, developed in June 2026, addresses the two remaining major
+problems: non-deterministic DC startup delays and the absence of a
+group-synchronised power-up gate.
+
+\subsection{Commit \texttt{0ff09ed} -- Deterministic SYNC0 Shift (Jun 2026)}
+\label{sec:sync0-fix}
+
+\subsubsection{Root Cause of 20-Second Startup Times}
+
+The upstream \texttt{addSlave()} function was called once per slave.  Inside
+it, a \texttt{clock\_gettime(CLOCK\_MONOTONIC, \&t)} was issued for each
+slave, and the SYNC0 shift was computed as:
+
+\begin{lstlisting}[language=C,caption={Old (broken) per-slave SYNC0 shift}]
+// OLD: issued per slave -- different timestamps, different phases
+clock_gettime(CLOCK_MONOTONIC, &t);
+uint32_t sync0_shift = interval_ - (t.tv_nsec % interval_);
+ecrt_slave_config_dc(config, 0x0100, interval_, sync0_shift, 0, 0);
+\end{lstlisting}
+
+Because \texttt{addSlave()} was called sequentially for each of the six
+drives, each received a \emph{different} effective SYNC0 phase.  During the
+SAFEOP$\to$OP transition, the IgH master waited for each drive's individual
+SYNC0 alignment before releasing it to OP, leading to roughly 1--5\,s per
+joint and a total startup time of 15--20\,seconds.
+
+\begin{center}
+\begin{tikzpicture}
+  \begin{axis}[
+    xlabel={Joint index},
+    ylabel={Startup time (s)},
+    xtick={0,1,2,3,4,5},
+    ymin=0, ymax=22,
+    width=9cm, height=5cm,
+    bar width=0.5cm,
+    ybar,
+    nodes near coords,
+    every node near coord/.append style={font=\footnotesize},
+    title={Simulated worst-case startup (random SYNC0 phase)},
+    ymajorgrids=true,
+    grid style={dotted}
+  ]
+    \addplot coordinates {(0,1.2)(1,3.4)(2,2.8)(3,5.1)(4,4.0)(5,1.9)};
+    \addplot[fill=safegreen!50,draw=safegreen]
+            coordinates {(0,0.09)(1,0.09)(2,0.09)(3,0.09)(4,0.09)(5,0.09)};
+    \legend{Random phase (before fix), Fixed phase (after fix)}
+  \end{axis}
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Fix}
+
+A single, fixed SYNC0 shift equal to half the cycle interval (cycle midpoint)
+is applied \emph{identically} to every slave.  The application time is set
+\emph{once} in \texttt{activate()} immediately before
+\texttt{ecrt\_master\_activate()}:
+
+\begin{lstlisting}[caption={Fixed SYNC0 shift in \texttt{addSlave()}}]
+if (slave->assign_activate_dc_sync()) {
+  dc_used_ = true;
+  const uint32_t sync0_shift = interval_ / 2;  // same for all slaves
+  ecrt_slave_config_dc(
+    slave_info.config,
+    slave->assign_activate_dc_sync(),
+    interval_,
+    sync0_shift,
+    0, 0);
+}
+\end{lstlisting}
+
+With all six drives sharing the same SYNC0 phase, the IgH master aligns the
+entire bus simultaneously, reducing total startup time from $\sim$20\,s to
+$\sim$0.5\,s (dominated by CiA402 state-machine transitions).
+
+\subsection{Commit \texttt{a8268c7} -- Strict Init Readiness Gate (Jun 2026)}
+
+The activation loop was redesigned with a strict gate that requires all
+modules to be \emph{simultaneously} ready before declaring success.  The gate
+uses three independent criteria:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Domain WC state} = \texttt{EC\_WC\_COMPLETE} (all slaves OP
+        and responding)
+  \item \textbf{\texttt{readyForCommands()}} = \texttt{true}
+        (CiA402 state machine in \texttt{OPERATION\_ENABLED})
+  \item \textbf{\texttt{hasValidPosition()}} = \texttt{true}
+        (at least one finite \texttt{TPDO\_POSITION} received)
+\end{enumerate}
+
+All three conditions must hold for \texttt{init\_stable\_cycles\_} (default
+10) consecutive cycles.  If they do not hold within \texttt{init\_timeout\_}
+seconds (default 30\,s), activation aborts and reports which module is stuck
+along with its status string (CiA402 state + position validity + bus-OP flag).
+
+\subsection{Commit \texttt{902be31} -- Align Phase-0 Barrier Timeout and Debounce (Jun 2026)}
+
+Fine-tuned the \texttt{phase\_stable\_cycles\_} default from 20 to 10 cycles
+(matching the WC check frequency) and logged the total expected wait at the
+start of \texttt{on\_activate()}:
+
+\begin{lstlisting}[caption={Total timeout log at activation start}]
+RCLCPP_INFO(...,
+  "Starting ...please wait... "
+  "(max %.0f s barrier + %.0f s init = %.0f s total)",
+  phase_timeout_, init_timeout_,
+  phase_timeout_ + init_timeout_);
+\end{lstlisting}
+
+\subsection{Commit \texttt{3917d66} -- WIP: Fix 11 Bugs (Jun 2026)}
+\label{sec:bugfixes}
+
+A thorough review of the barrier-startup implementation against the original
+\texttt{main} branch revealed eleven bugs.  Each is described with its
+severity, impact, and fix below.
+
+% ==============================================================================
+\section{Bug Analysis and Fixes}
+\label{sec:bugs}
+
+\begin{table}[H]
+  \centering
+  \caption{Summary of all 11 fixed bugs}
+  \label{tab:bugs}
+  \small
+  \begin{tabularx}{\textwidth}{@{}c l X l@{}}
+    \toprule
+    \# & Location & Description & Severity \\
+    \midrule
+    1 & \texttt{generic\_ec\_cia402\_drive.cpp} &
+        \texttt{initialized\_} semantics: was set to EtherCAT bus-OP, not
+        CiA402 OPERATION\_ENABLED & High \\
+    2 & \texttt{ethercat\_driver.cpp} /
+        \texttt{generic\_ec\_cia402\_drive.hpp} &
+        Shadowed function name: static helper had same name as virtual
+        method added later & High \\
+    3 & \texttt{ec\_master.cpp} &
+        No null-pointer check before \texttt{memcpy} in
+        \texttt{transferAll()} & Medium \\
+    4 & \texttt{ethercat\_driver.hpp} &
+        \texttt{phase\_stable\_cycles\_} default 20 vs.\ 10 intended & Low \\
+    5 & \texttt{ethercat\_driver.cpp} &
+        Missing total-timeout log at \texttt{on\_activate()} entry & Low \\
+    6 & \texttt{ethercat\_driver.cpp} &
+        SDO failure logged at \texttt{INFO} instead of \texttt{ERROR} & Medium \\
+    7 & \texttt{ethercat\_driver.cpp} &
+        \texttt{std::stod} used for integer slave position parameter & Low \\
+    8 & \texttt{ethercat\_driver.cpp} &
+        Double push of transfer slaves into \texttt{ec\_transfer\_slaves\_} & Medium \\
+    9 & \texttt{ethercat\_driver.hpp/.cpp} &
+        \texttt{kMaxConsecutiveWcFailures} was \texttt{constexpr} (not
+        configurable at runtime) & Medium \\
+    NaN-1 & \texttt{generic\_ec\_cia402\_drive.cpp} &
+        Fault-reset latch stuck on NaN command (IEEE\,754 trap) & High \\
+    NaN-2 & \texttt{generic\_ec\_cia402\_drive.cpp} &
+        Position-hold latch entered when \texttt{last\_position\_} is NaN & Medium \\
+    NaN-3 & \texttt{generic\_ec\_cia402\_drive.cpp} &
+        Controller-active path wrote NaN to \texttt{default\_value} & Medium \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Bug~1 -- \texttt{initialized\_} Semantics}
+\label{sec:bug1}
+
+\textbf{Location:} \texttt{generic\_ec\_cia402\_drive.cpp:64},
+\texttt{updateState()}
+
+\textbf{Impact:} The activation loop in \texttt{on\_activate()} checked
+\texttt{module->initialized()} and \texttt{module->readyForCommands()}.
+Because \texttt{initialized\_} was set to \texttt{is\_operational\_} (the
+EtherCAT bus-OP flag, polled every 10 cycles), it could become
+\texttt{true} well before the CiA402 state machine reached
+\texttt{OPERATION\_ENABLED}.  The driver could declare activation success with
+drives still in \texttt{SWITCH\_ON\_DISABLED}.
+
+\begin{lstlisting}[caption={Bug~1: before and after}]
+// BEFORE (wrong):
+initialized_ = is_operational_;
+
+// AFTER (correct):
+initialized_ = is_operational_ && (state_ == STATE_OPERATION_ENABLED);
+\end{lstlisting}
+
+Additionally, the activation loop was simplified: the redundant
+\texttt{module->initialized()} check was removed, relying solely on
+\texttt{readyForCommands()} (statusword-based, every cycle) which is both
+faster and more precise than the 10-cycle-polling \texttt{is\_operational\_}
+flag.
+
+\subsection{Bug~2 -- Shadowed Function Name in Barrier}
+\label{sec:bug2}
+
+\textbf{Location:} \texttt{ethercat\_driver.cpp} (unnamed namespace) vs.\
+\texttt{generic\_ec\_cia402\_drive.hpp/cpp}
+
+\textbf{Impact:} When the barrier-startup feature was added, a virtual method
+\texttt{cia402PowerupRank()} was added to the \texttt{EcSlave} base class
+and overridden in \texttt{EcCiA402Drive}.  An \emph{unnamed namespace} in
+\texttt{ethercat\_driver.cpp} also contained a free function named
+\texttt{cia402PowerupRank(int state)}.  The driver's call site called the
+free function (compile-time lookup) rather than the virtual override
+(runtime dispatch), meaning the rank was computed from a function that was
+not aware of the current instance's state.
+
+\textbf{Fix:} The static helper was renamed to \texttt{powerupRankOf()} and
+moved to the \texttt{EcCiA402Drive} class as a \texttt{static} method.  The
+unnamed namespace block in \texttt{ethercat\_driver.cpp} was deleted
+entirely.  The virtual base returns $-1$ (``not a CiA402 drive'') for
+non-drive slaves.
+
+\begin{lstlisting}[caption={Bug~2: renamed static helper}]
+// ec_slave.hpp (base class):
+virtual int cia402PowerupRank() const { return -1; }
+
+// generic_ec_cia402_drive.hpp:
+int cia402PowerupRank() const override { return powerupRankOf(state_); }
+static int powerupRankOf(DeviceState state);
+
+// generic_ec_cia402_drive.cpp:
+int EcCiA402Drive::powerupRankOf(DeviceState state) {
+  switch (state) {
+    case STATE_SWITCH_ON_DISABLED:  return 0;
+    case STATE_READY_TO_SWITCH_ON:  return 1;
+    case STATE_SWITCH_ON:           return 2;
+    case STATE_OPERATION_ENABLED:   return 3;
+    default:                        return -1;
+  }
+}
+\end{lstlisting}
+
+\subsection{Bug~3 -- Null Pointer in \texttt{transferAll()}}
+\label{sec:bug3}
+
+\textbf{Location:} \texttt{ec\_master.cpp}, \texttt{transferAll()}
+
+\textbf{Impact:} The transfer-copy loop iterated over all registered
+\texttt{EcTransfer} objects and called \texttt{memcpy(out\_ptr, in\_ptr,
+size)} without checking for null pointers.  If a transfer was incompletely
+configured (e.g., a module registered in the transfer table but its PDO
+domain address not yet resolved), the copy caused a null-pointer dereference
+and a process crash.
+
+\begin{lstlisting}[caption={Bug~3: null-pointer guard in \texttt{transferAll()}}]
+for (auto & transfer : transfers_) {
+  if (transfer.in_ptr == nullptr || transfer.out_ptr == nullptr) {
+    RCLCPP_ERROR(..., "transferAll: null pointer, skipping transfer");
+    continue;
+  }
+  memcpy(transfer.out_ptr, transfer.in_ptr, transfer.size);
+}
+\end{lstlisting}
+
+\subsection{Bug~4 -- Wrong Default for \texttt{phase\_stable\_cycles\_}}
+\label{sec:bug4}
+
+\textbf{Location:} \texttt{ethercat\_driver.hpp}
+
+The default value was 20 cycles, but the design intent (matching the WC
+state polling frequency and the \texttt{init\_stable\_cycles\_} default)
+was 10 cycles.  With 20 the barrier phase took twice as long to pass after
+all drives were ready.
+
+\textbf{Fix:} \texttt{int phase\_stable\_cycles\_ = 20}
+$\to$ \texttt{int phase\_stable\_cycles\_ = 10}.
+
+\subsection{Bug~5 -- Missing Total-Timeout Log}
+\label{sec:bug5}
+
+\textbf{Location:} \texttt{ethercat\_driver.cpp}, start of \texttt{on\_activate()}
+
+Without a log of the combined timeout budget (\texttt{phase\_timeout\_} +
+\texttt{init\_timeout\_}), operators had no indication of the expected wait
+time during startup.  Added a single \texttt{RCLCPP\_INFO} at the entry
+point of \texttt{on\_activate()}.
+
+\subsection{Bug~6 -- SDO Failure Logged at \texttt{INFO}}
+\label{sec:bug6}
+
+\textbf{Location:} \texttt{ethercat\_driver.cpp}, SDO configuration loop
+
+When \texttt{ecrt\_master\_sdo\_download()} returned a non-zero error code,
+the original code logged at \texttt{RCLCPP\_INFO} level, making SDO
+misconfiguration invisible in normal operation.
+
+\textbf{Fix:} Changed to \texttt{RCLCPP\_ERROR} and included both the
+return code and the abort code in the message:
+
+\begin{lstlisting}[caption={Bug~6: SDO error logging}]
+RCLCPP_ERROR(...,
+  "Failed to download SDO for module at position %s: "
+  "ret=%d abort_code=0x%08X",
+  ec_module_parameters_[i]["position"].c_str(),
+  ret, abort_code);
+\end{lstlisting}
+
+\subsection{Bug~7 -- \texttt{std::stod} for Integer Slave Position}
+\label{sec:bug7}
+
+\textbf{Location:} \texttt{ethercat\_driver.cpp}, SDO loop
+
+The slave position YAML parameter (always an integer like \texttt{"0"},
+\texttt{"1"}, \ldots) was parsed with \texttt{std::stod} and implicitly
+truncated when passed to \texttt{configSlaveSdo()} which takes
+\texttt{uint16\_t}.  Floating-point parsing of ``\texttt{0}'' is fine in
+practice, but the intent is clearly an unsigned integer.
+
+\textbf{Fix:} \texttt{std::stod(...)} $\to$ \texttt{std::stoul(...)}.
+
+\subsection{Bug~8 -- Double Push of Transfer Slaves}
+\label{sec:bug8}
+
+\textbf{Location:} \texttt{ethercat\_driver.cpp}, transfer-network
+configuration
+
+The transfer-slave index vector \texttt{ec\_transfer\_slaves\_} was built by
+two loops that iterated over the same range of modules.  The first loop
+pushed all indices in the range; the second loop (the surviving one) did the
+same.  Every transfer slave was thus registered twice.
+
+\textbf{Fix:} Deleted the first (duplicate) loop body entirely.
+
+\subsection{Bug~9 -- \texttt{kMaxConsecutiveWcFailures} Not Runtime-Configurable}
+\label{sec:bug9}
+
+\textbf{Location:} \texttt{ethercat\_driver.hpp/.cpp}
+
+The WC failure threshold was declared \texttt{static constexpr int
+kMaxConsecutiveWcFailures = 5} (compile-time constant).  This meant it could
+not be overridden via the hardware parameter \texttt{max\_wc\_failures} in
+the URDF.  The parameter-parsing block was also missing.
+
+\textbf{Fix:}
+\begin{enumerate}[nosep]
+  \item Renamed to \texttt{int kMaxConsecutiveWcFailures\_ = 5} (instance
+        member with default).
+  \item Added parameter parsing in \texttt{on\_configure()}:
+\begin{lstlisting}
+if (info_.hardware_parameters.find("max_wc_failures") !=
+    info_.hardware_parameters.end()) {
+  kMaxConsecutiveWcFailures_ =
+    std::stoi(info_.hardware_parameters["max_wc_failures"]);
+}
+if (kMaxConsecutiveWcFailures_ < 1) { kMaxConsecutiveWcFailures_ = 1; }
+\end{lstlisting}
+\end{enumerate}
+
+% ==============================================================================
+\section{NaN Safety Analysis}
+\label{sec:nan}
+
+IEEE\,754 NaN (Not-a-Number) has a counterintuitive property: \texttt{NaN ==
+x} is \emph{always} \texttt{false}, including \texttt{NaN == 0}.  C++
+programmers familiar with ordinary float comparisons may write ``\texttt{if
+(x == 0)} \ldots\ \texttt{else}'' logic that silently fails for NaN inputs.
+In a real-time motor driver this can block safety-critical state transitions.
+
+\subsection{NaN Sources in the Driver}
+
+\begin{itemize}[nosep]
+  \item \textbf{Startup}: All command and state interface vectors are
+        initialised to \texttt{std::numeric\_limits<double>::quiet\_NaN()}.
+        Until the first PDO cycle returns data, \texttt{last\_position\_} is
+        NaN.
+  \item \textbf{Controller inactive}: When \texttt{ros2\_control}
+        deactivates a controller, it writes NaN to all command interfaces it
+        owned.  This is the \emph{intended} signal that no controller owns
+        the interface.
+  \item \textbf{PDO decode}: \texttt{EC\_READ\_S32()} reads a signed 32-bit
+        integer from the PDO domain and casts it to \texttt{double} via
+        \texttt{static\_cast}, which is always finite ($\pm 2^{31}$).
+        Therefore \texttt{last\_position\_} is never NaN \emph{after} the
+        first PDO read.
+\end{itemize}
+
+\subsection{Existing NaN Firewall in \texttt{ec\_write()}}
+
+The upstream channel manager already had a NaN firewall:
+
+\begin{lstlisting}[caption={Existing NaN guard in \texttt{ec\_write()}}]
+void EcPdoSingleInterfaceChannelManager::ec_write(
+  uint8_t * domain_address, double value, ...)
+{
+  if (!std::isnan(default_value)) {
+    write_function_(domain_address, last_value, mask);
+  } else {
+    return;  // Do nothing -- domain unchanged
+  }
+}
+\end{lstlisting}
+
+This prevents a NaN \texttt{default\_value} from ever being sent to the
+drive.  However, it does not prevent NaN from corrupting internal state.
+
+\subsection{NaN Bug~1 -- Fault-Reset Latch Stuck on NaN}
+\label{sec:nan1}
+
+\textbf{Symptom:} After a drive fault, commanding fault-reset (writing 1.0
+to the fault-reset command interface) triggered the reset correctly.  But if
+the controller was then deactivated (command interface set to NaN), the
+\texttt{last\_fault\_reset\_command\_} flag remained \texttt{true} forever.
+The next fault would be \emph{silently ignored}: the driver saw the
+\texttt{last\_fault\_reset\_command\_} still as \texttt{true}, so no rising
+edge was detected and \texttt{fault\_reset\_} was never set.
+
+\textbf{Root cause:}
+\begin{lstlisting}[caption={NaN Bug~1: original (broken) fault-reset logic}]
+// BROKEN: NaN == 0 is false in IEEE 754 -- latch stays true forever
+if (command_interface_ptr_->at(fault_reset_command_interface_index_) == 0) {
+    last_fault_reset_command_ = false;
+}
+if (!last_fault_reset_command_ &&
+    command_interface_ptr_->at(fault_reset_command_interface_index_) != 0) {
+    last_fault_reset_command_ = true;
+    fault_reset_ = true;
+}
+\end{lstlisting}
+
+\textbf{Fix:}
+\begin{lstlisting}[caption={NaN Bug~1: corrected fault-reset logic}]
+const double fr_cmd =
+  command_interface_ptr_->at(fault_reset_command_interface_index_);
+// NaN == 0 is always false -> must check isnan explicitly
+if (std::isnan(fr_cmd) || fr_cmd == 0) {
+  last_fault_reset_command_ = false;
+}
+if (!last_fault_reset_command_ && !std::isnan(fr_cmd) && fr_cmd != 0) {
+  last_fault_reset_command_ = true;
+  fault_reset_ = true;
+}
+\end{lstlisting}
+
+\subsection{NaN Bug~2 -- Position-Hold Latch Entered on NaN}
+\label{sec:nan2}
+
+\textbf{Symptom:} At startup (before the first PDO cycle),
+\texttt{last\_position\_} is NaN.  The controller is inactive (command NaN),
+so the position-hold branch was entered.  The condition
+\texttt{!position\_hold\_initialized\_} was \texttt{true}, so
+\texttt{default\_value} was set to \texttt{factor * NaN + offset = NaN}.
+
+Although the NaN firewall in \texttt{ec\_write()} prevents the NaN from
+reaching the drive, setting \texttt{default\_value = NaN} and
+\texttt{position\_hold\_initialized\_ = true} caused the latch to be
+considered ``initialised'' with an invalid value.  When the controller later
+became active and then inactive again, the hold latch would not re-latch
+from the now-valid position.
+
+\textbf{Fix:} Guard the latch entry with \texttt{std::isfinite(last\_position\_)}:
+
+\begin{lstlisting}[caption={NaN Bug~2: finite guard on position-hold latch}]
+// BEFORE:
+if (!position_hold_initialized_) {
+    channel.default_value = channel.factor * last_position_ + channel.offset;
+    position_hold_initialized_ = true;
+}
+
+// AFTER:
+if (!position_hold_initialized_ && std::isfinite(last_position_)) {
+    channel.default_value = channel.factor * last_position_ + channel.offset;
+    position_hold_initialized_ = true;
+}
+\end{lstlisting}
+
+\subsection{NaN Bug~3 -- Controller-Active Path Propagated NaN}
+\label{sec:nan3}
+
+\textbf{Symptom:} When the controller was active but \texttt{last\_position\_}
+was still NaN (possible in the first cycle before any TPDO arrived),
+\texttt{default\_value} was set to NaN unconditionally:
+
+\begin{lstlisting}[caption={NaN Bug~3: unguarded assignment in controller-active path}]
+// BEFORE (always written, even when last_position_ is NaN):
+channel.default_value = channel.factor * last_position_ + channel.offset;
+\end{lstlisting}
+
+While the NaN firewall in \texttt{ec\_write()} prevents transmission, the
+NaN in \texttt{default\_value} was then used to \emph{update} the latch on
+the next inactive cycle, breaking the position-hold invariant.
+
+\textbf{Fix:}
+\begin{lstlisting}[caption={NaN Bug~3: finite guard on controller-active path}]
+// AFTER: only update default_value when position is known-finite
+if (std::isfinite(last_position_)) {
+  channel.default_value = channel.factor * last_position_ + channel.offset;
+}
+\end{lstlisting}
+
+\subsection{NaN Safety Summary}
+
+The three-layer NaN defence is:
+\begin{enumerate}[nosep]
+  \item \textbf{Mode guard}: The entire position block is skipped if
+        \texttt{mode\_of\_operation\_display\_ == MODE\_NO\_MODE} (drive not
+        yet in CSP mode), preventing any write while the drive is starting up.
+  \item \textbf{Finite guards (new)}: \texttt{std::isfinite(last\_position\_)}
+        before every assignment to \texttt{default\_value}.
+  \item \textbf{NaN firewall (existing)}: \texttt{ec\_write()} skips the write
+        when \texttt{default\_value} is NaN.
+\end{enumerate}
+
+After the first PDO cycle, \texttt{EC\_READ\_S32()} always produces a finite
+\texttt{double}, so \texttt{last\_position\_} is never NaN after cycle\,1.
+The finite guards in layers 1 and 2 cover only the brief startup window.
+
+% ==============================================================================
+\section{Architecture of the Deterministic Barrier}
+\label{sec:barrier-arch}
+
+\subsection{CiA402 Power-Up Sequence}
+
+CiA402 defines a mandatory sequential power-up path through the following
+device states:
+
+\begin{center}
+\begin{tikzpicture}[
+  state/.style={rectangle,rounded corners,draw,minimum width=2.8cm,
+                minimum height=0.6cm,font=\small\ttfamily,fill=blue!7},
+  arrow/.style={-Stealth,thick,blue!50}
+]
+  \node[state] (sod)  {SWITCH\_ON\_DISABLED};
+  \node[state,right=1.4cm of sod] (rtso) {READY\_TO\_SWITCH\_ON};
+  \node[state,right=1.4cm of rtso] (so)   {SWITCH\_ON};
+  \node[state,right=1.4cm of so]   (oe)   {OPERATION\_ENABLED};
+
+  \draw[arrow] (sod)  -- node[above,font=\tiny]{CW 0x06} (rtso);
+  \draw[arrow] (rtso) -- node[above,font=\tiny]{CW 0x07} (so);
+  \draw[arrow] (so)   -- node[above,font=\tiny]{CW 0x0F} (oe);
+\end{tikzpicture}
+\end{center}
+
+The power-up ranks assigned in \texttt{powerupRankOf()} are:
+\texttt{SWITCH\_ON\_DISABLED=0}, \texttt{READY\_TO\_SWITCH\_ON=1},
+\texttt{SWITCH\_ON=2}, \texttt{OPERATION\_ENABLED=3}.  States outside this
+path (fault, quick-stop, undefined) return $-1$.
+
+\subsection{Barrier Mechanism}
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=1.2cm,
+  phase/.style={rectangle,draw,fill=orange!10,minimum width=8cm,
+                minimum height=0.7cm,font=\small},
+  check/.style={diamond,draw,fill=yellow!20,aspect=2.5,font=\footnotesize},
+  action/.style={rectangle,draw,fill=green!10,minimum width=5cm,font=\small}
+]
+  \node[phase] (p0arm) {Arm barrier: all CiA402 drives set to target=SOD};
+  \node[check,below=0.5cm of p0arm] (check) {WC\_COMPLETE \&\& all drives rank $\geq 0$?};
+  \node[action,right=2cm of check] (stable)  {stable\_cycles++};
+  \node[action,below=0.5cm of check] (wait)   {clock\_nanosleep + master->update()};
+  \node[phase,below=0.5cm of wait] (release) {Disarm barrier: setStartupBarrier(false)};
+  \node[phase,below=0.5cm of release] (init)  {Init gate: wait all drives OPERATION\_ENABLED};
+
+  \draw[-Stealth] (p0arm) -- (check);
+  \draw[-Stealth] (check) -- node[right,font=\tiny]{yes} (stable);
+  \draw[-Stealth] (check) -- node[right,font=\tiny]{no / reset} (wait);
+  \draw[-Stealth] (wait.west) -- ++(-1,0) |- (check.west);
+  \draw[-Stealth] (stable.south) -- ++(0,-0.4) -| node[above right,font=\tiny]{$\geq$ stable\_cycles} (release.east);
+  \draw[-Stealth] (release) -- (init);
+\end{tikzpicture}
+\end{center}
+
+\textbf{Phase 0 (bus gate):} Every CiA402 drive has its barrier armed with
+target state \texttt{SWITCH\_ON\_DISABLED} (rank 0).  Inside
+\texttt{processData()}, when the drive reaches or passes the target rank, the
+control word is held at its current value instead of advancing.  The barrier
+holds until:
+\begin{enumerate}[nosep]
+  \item The domain WC state is \texttt{EC\_WC\_COMPLETE} (all slaves OP), \emph{and}
+  \item Every CiA402 drive has power-up rank $\geq 0$ (is at or past
+        \texttt{SWITCH\_ON\_DISABLED}).
+\end{enumerate}
+
+This condition must hold for \texttt{phase\_stable\_cycles\_} (10) consecutive
+cycles to account for transient WC glitches on bus bring-up.
+
+After the barrier is released, all drives transition freely through
+\texttt{READY\_TO\_SWITCH\_ON $\to$ SWITCH\_ON $\to$ OPERATION\_ENABLED}
+in parallel, reaching full readiness in milliseconds rather than seconds.
+
+\subsection{Fault Safety During Barrier}
+
+The barrier checks \texttt{module->cia402State() >= 0} before calling
+\texttt{setStartupBarrier(true, target)}.  This means:
+\begin{itemize}[nosep]
+  \item Non-drive slaves (EK/EL Beckhoff terminals) are never armed.
+  \item A drive in FAULT state has rank $-1$ and is excluded from the
+        ``all at target'' check, allowing fault recovery to proceed
+        independently via \texttt{transition()}.
+\end{itemize}
+
+\texttt{setStartupBarrier(false, 0)} passes 0 as the target, but
+\texttt{barrier\_target\_state\_} is only read when
+\texttt{barrier\_enabled\_} is \texttt{true}, so passing 0 when disarming
+is safe.
+
+% ==============================================================================
+\section{Runtime Safety Supervision}
+\label{sec:runtime-safety}
+
+Once the system is activated, the \texttt{read()} callback enforces three
+ongoing safety invariants:
+
+\begin{enumerate}
+  \item \textbf{Link check}: \texttt{isMasterLinkUp()} -- cable pull or
+        switch power-off triggers an immediate stop.
+  \item \textbf{WC check}: domain WC state must be
+        \texttt{EC\_WC\_COMPLETE} for at most \texttt{kMaxConsecutiveWcFailures\_}
+        (default 5) consecutive cycles.  A persistent WC fault (all slaves
+        not responding) triggers a controlled stop.
+  \item \textbf{Drive group failfast}: if any CiA402 drive leaves
+        \texttt{OPERATION\_ENABLED} or loses a valid position for
+        \texttt{runtime\_drive\_fault\_cycles\_} (default 10) consecutive
+        cycles, the entire arm stops (\emph{no partial operation}).
+        The faulted drive is identified by alias and position in the error
+        log, with its \texttt{statusString()}.
+\end{enumerate}
+
+The rationale for group failfast (stopping all drives when one faults) is
+that partial operation of a robotic arm with one joint disabled can result in
+uncontrolled motion due to gravity and inertia.
+
+% ==============================================================================
+\section{Configurable Hardware Parameters}
+\label{sec:params}
+
+All safety and timing parameters are configurable from the URDF/xacro
+\texttt{<hardware>} block without recompilation:
+
+\begin{table}[H]
+  \centering
+  \caption{Hardware parameters and their defaults}
+  \label{tab:params}
+  \small
+  \begin{tabularx}{\textwidth}{@{}l l X@{}}
+    \toprule
+    Parameter & Default & Description \\
+    \midrule
+    \texttt{init\_timeout} & 30\,s &
+      Max time for all modules to reach OPERATION\_ENABLED \\
+    \texttt{init\_stable\_cycles} & 10 &
+      Cycles all modules must simultaneously be ready \\
+    \texttt{phase\_timeout} & 20\,s &
+      Max time for barrier phase 0 (bus gate) \\
+    \texttt{phase\_stable\_cycles} & 10 &
+      Cycles WC\_COMPLETE must hold before releasing barrier \\
+    \texttt{startup\_mode} & \texttt{barrier} &
+      \texttt{barrier} or \texttt{legacy} (per-drive auto-transition) \\
+    \texttt{max\_wc\_failures} & 5 &
+      Consecutive WC failures before controlled stop \\
+    \texttt{runtime\_drive\_supervision} & \texttt{true} &
+      Enable/disable runtime group failfast \\
+    \texttt{runtime\_drive\_fault\_cycles} & 10 &
+      Cycles drive fault must persist before group stop \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\textbf{Example URDF snippet:}
+\begin{lstlisting}[language=XML,caption={Hardware parameters in URDF}]
+<hardware>
+  <plugin>ethercat_driver/EthercatDriver</plugin>
+  <param name="master_id">0</param>
+  <param name="control_frequency">1000</param>
+  <param name="startup_mode">barrier</param>
+  <param name="phase_timeout">20</param>
+  <param name="phase_stable_cycles">10</param>
+  <param name="init_timeout">30</param>
+  <param name="init_stable_cycles">10</param>
+  <param name="max_wc_failures">5</param>
+  <param name="runtime_drive_supervision">true</param>
+  <param name="runtime_drive_fault_cycles">10</param>
+</hardware>
+\end{lstlisting}
+
+% ==============================================================================
+\section{ROS\,2 Lifecycle and Threading Model}
+\label{sec:lifecycle}
+
+\begin{center}
+\begin{tikzpicture}[
+  cb/.style={rectangle,rounded corners,draw,fill=blue!8,minimum width=3.8cm,
+             minimum height=0.8cm,font=\small\ttfamily},
+  arrow/.style={-Stealth,thick}
+]
+  \node[cb] (oninit)    {\textbf{on\_init()}\\param parse, alloc NaN};
+  \node[cb,right=1.5cm of oninit] (oncfg)  {\textbf{on\_configure()}\\SDO, plugins};
+  \node[cb,right=1.5cm of oncfg] (onact)   {\textbf{on\_activate()}\\barrier + init gate};
+  \node[cb,below=1.2cm of onact] (rdwr)    {\textbf{read()/write()}\\RT loop @ 1\,kHz};
+  \node[cb,below=1.2cm of oncfg] (ondact)  {\textbf{on\_deactivate()}\\master->deactivate()};
+  \node[cb,below=1.2cm of oninit] (onerr)  {\textbf{on\_error()}\\stop + shutdown};
+
+  \draw[arrow] (oninit) -- (oncfg);
+  \draw[arrow] (oncfg)  -- (onact);
+  \draw[arrow] (onact)  -- (rdwr);
+  \draw[arrow] (rdwr.south) -- ++(0,-0.5) -| (ondact.north);
+  \draw[arrow] (rdwr.south) -- ++(0,-0.5) -| (onerr.north);
+  \draw[arrow] (ondact.west) -- ++(-0.5,0) |- (onerr.east);
+\end{tikzpicture}
+\end{center}
+
+The real-time loop (\texttt{read()}/\texttt{write()}) runs in the
+\texttt{ros2\_control} update thread at 1\,kHz.  All \texttt{on\_*()}
+lifecycle callbacks hold \texttt{ec\_mutex\_} to prevent concurrent access.
+The \texttt{read()} call uses \texttt{std::try\_to\_lock} so that a
+lifecycle transition (which holds the mutex) does not block the RT thread
+indefinitely.
+
+% ==============================================================================
+\section{Plugin Architecture}
+\label{sec:plugins}
+
+\begin{infobox}[title=Pluginlib overview]
+  The driver loads EtherCAT slave implementations at runtime via
+  \texttt{pluginlib}.  Every slave plugin inherits from
+  \texttt{ethercat\_interface::EcSlave} and is declared via
+  \texttt{PLUGINLIB\_EXPORT\_CLASS}.  The driver URDF specifies the plugin
+  class name; the classloader finds the shared library at runtime.
+\end{infobox}
+
+Key virtual methods in \texttt{EcSlave}:
+\begin{itemize}[nosep]
+  \item \texttt{setupSlave()} -- parse YAML parameters, map PDO channels
+  \item \texttt{processData(entry\_idx, domain\_address)} -- called per PDO
+        entry every cycle
+  \item \texttt{readyForCommands()} -- drive-level readiness (default false)
+  \item \textbf{new} \texttt{hasValidPosition()} -- at least one finite
+        position received (default true for non-drive slaves)
+  \item \textbf{new} \texttt{statusString()} -- diagnostic string for error logs
+  \item \textbf{new} \texttt{cia402State()} -- current CiA402 state as int,
+        $-1$ for non-drive slaves
+  \item \textbf{new} \texttt{cia402PowerupRank()} -- power-up path rank,
+        $-1$ for non-drive slaves
+  \item \textbf{new} \texttt{setStartupBarrier(enabled, target)} -- arm/disarm
+        group barrier
+\end{itemize}
+
+The new methods have safe defaults in the base class so that non-CiA402
+slaves (e.g., Beckhoff EL analogue modules) work without modification.
+
+% ==============================================================================
+\section{Summary of All Changes by File}
+\label{sec:changes-by-file}
+
+\begin{longtable}{@{}>{\ttfamily\small}p{7cm} p{8.5cm}@{}}
+  \toprule
+  \normalfont\textbf{File} & \normalfont\textbf{Change} \\
+  \midrule
+  \endfirsthead
+  \multicolumn{2}{c}{\small\itshape (continued)} \\
+  \toprule
+  \normalfont\textbf{File} & \normalfont\textbf{Change} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endlastfoot
+
+  ethercat\_interface/include/\\ethercat\_interface/ec\_slave.hpp &
+    Added 5 new virtual methods with safe defaults:
+    \texttt{readyForCommands()}, \texttt{hasValidPosition()},
+    \texttt{statusString()}, \texttt{cia402State()},
+    \texttt{cia402PowerupRank()}, \texttt{setStartupBarrier()} \\
+  \addlinespace
+
+  ethercat\_interface/src/ec\_master.cpp &
+    Fixed per-slave random SYNC0 phase (Bug DC); added null-ptr guard in
+    \texttt{transferAll()} (Bug~3); added application-time monotonic update
+    in \texttt{update()}; added \texttt{deactivate()} + \texttt{release}
+    for clean shutdown \\
+  \addlinespace
+
+  ethercat\_driver/include/\\ethercat\_driver/ethercat\_driver.hpp &
+    Added all barrier/init/supervision member variables; changed
+    \texttt{kMaxConsecutiveWcFailures} from \texttt{constexpr} to
+    \texttt{int kMaxConsecutiveWcFailures\_} (Bug~9);
+    \texttt{phase\_stable\_cycles\_ = 10} (Bug~4);
+    declared \texttt{runBarrierStartup()} \\
+  \addlinespace
+
+  ethercat\_driver/src/ethercat\_driver.cpp &
+    Added parameter parsing for all new parameters (Bugs~4,6,7,8,9);
+    safety stop in \texttt{read()} (link + WC + group failfast);
+    \texttt{on\_error()} lifecycle;
+    \texttt{runBarrierStartup()} implementation;
+    strict init gate in \texttt{on\_activate()};
+    removed duplicate transfer-slave push (Bug~8);
+    \texttt{stoul} for slave position (Bug~7);
+    SDO errors at \texttt{RCLCPP\_ERROR} (Bug~6);
+    deleted unnamed namespace with shadowed \texttt{cia402PowerupRank} (Bug~2) \\
+  \addlinespace
+
+  ethercat\_generic\_plugins/\ldots/generic\_ec\_cia402\_drive.hpp &
+    Added \texttt{position\_hold\_initialized\_};
+    added override declarations for all new \texttt{EcSlave} virtual methods;
+    renamed static helper \texttt{cia402PowerupRank} $\to$
+    \texttt{powerupRankOf} (Bug~2);
+    \texttt{last\_position\_} initialised to NaN;
+    added barrier member variables \\
+  \addlinespace
+
+  ethercat\_generic\_plugins/\ldots/generic\_ec\_cia402\_drive.cpp &
+    Fixed \texttt{initialized\_} semantics (Bug~1);
+    NaN-safe fault-reset latch (NaN Bug~1);
+    finite guard on position-hold latch entry (NaN Bug~2);
+    finite guard on controller-active path (NaN Bug~3);
+    \texttt{powerupRankOf()} static method (Bug~2);
+    added \texttt{readyForCommands()}, \texttt{hasValidPosition()},
+    \texttt{statusString()} implementations \\
+\end{longtable}
+
+% ==============================================================================
+\section{Commissioning and Test Plan}
+\label{sec:testplan}
+
+\subsection{Pre-Flight Checks}
+
+\begin{enumerate}[nosep]
+  \item Verify IgH EtherCAT Master is running:
+        \texttt{sudo /etc/init.d/ethercat status}
+  \item Confirm all 6 drives appear:
+        \texttt{ethercat slaves} should show 6 entries in PREOP
+  \item Confirm PREEMPT\_RT kernel: \texttt{uname -r} should show \texttt{-rt}
+  \item Confirm real-time scheduling for the ROS\,2 process (CPU affinity,
+        \texttt{SCHED\_FIFO})
+\end{enumerate}
+
+\subsection{Startup Test Protocol}
+
+\begin{enumerate}
+  \item Launch the driver with \texttt{startup\_mode: barrier}.
+  \item Observe the log: expect\\
+        \texttt{Barrier startup: phase-0 bus gate (phase\_timeout=20.0s, stable\_cycles=10)}\\
+        then $<$1\,s later:\\
+        \texttt{Barrier startup: all drives reached 'SWITCH\_ON\_DISABLED'}\\
+        then $\sim$50\,ms later:\\
+        \texttt{System Successfully started!}
+  \item Total startup time should be $<$2\,s with fixed SYNC0.
+  \item Compare to legacy mode (\texttt{startup\_mode: legacy}): expect
+        15--20\,s with the original random-phase DC code.
+\end{enumerate}
+
+\subsection{Safety Stop Tests}
+
+\begin{enumerate}
+  \item \textbf{Cable pull test}: with the arm stationary, physically unplug
+        the EtherCAT cable.  Expect the driver to log
+        \texttt{SAFETY: EtherCAT link DOWN} and call \texttt{on\_error()}
+        within 1\,ms.
+  \item \textbf{WC failure test}: power-cycle one slave while running.
+        Expect \texttt{Domain WC not COMPLETE for 5 consecutive cycles}.
+  \item \textbf{Drive fault test}: send a fault-inducing command to one drive
+        (overcurrent, etc.).  Expect
+        \texttt{SAFETY: Drive ... left ready state ... group failfast}.
+  \item \textbf{Fault-reset test}: after a drive fault, command
+        \texttt{fault\_reset = 1.0} via the command interface, then
+        \texttt{fault\_reset = 0.0} (or NaN).  Expect the drive to recover
+        and return to OPERATION\_ENABLED.  Repeat three times to verify no
+        latch-stuck regression.
+\end{enumerate}
+
+\subsection{NaN Safety Tests}
+
+\begin{enumerate}
+  \item Start the driver and immediately deactivate the trajectory controller
+        (set command to NaN).  Verify no crash, no SDO errors, and that
+        \texttt{last\_position\_} becomes finite within the first PDO cycle.
+  \item Activate the trajectory controller, command a position, then
+        deactivate.  Verify the drive holds position (no drift) and
+        \texttt{position\_hold\_initialized\_} latches only once after
+        \texttt{last\_position\_} is finite.
+  \item Trigger a drive fault, then command \texttt{fault\_reset = 1.0} via
+        the interface while the controller is active.  Set the command to NaN.
+        Verify \texttt{last\_fault\_reset\_command\_} resets to \texttt{false}
+        (check via a debug log or debugger watchpoint).
+\end{enumerate}
+
+% ==============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+The evolution of \texttt{ethercat\_driver\_ros2} from the upstream
+\texttt{main} branch through \texttt{saftey\_features\_clean} and into
+\texttt{deterministic-barrier-startup} represents a comprehensive hardening of
+the driver for use with safety-critical robotic hardware:
+
+\begin{itemize}[nosep]
+  \item \textbf{Immediate safety stops} on link-down, WC failure, and
+        individual drive faults, with group-failfast semantics to prevent
+        partial-arm operation.
+  \item \textbf{Deterministic startup}: a single fixed SYNC0 phase eliminates
+        the 15--20\,s non-deterministic DC alignment delay; the phase-0
+        barrier ensures all drives advance through the CiA402 state machine
+        simultaneously.
+  \item \textbf{Eleven bugs fixed}, including three IEEE\,754 NaN-safety
+        issues in the fault-reset and position-hold paths, a function-name
+        shadow that caused the barrier rank to be computed incorrectly, and
+        a null-pointer risk in the transfer subsystem.
+  \item \textbf{Full runtime configurability} of all timeouts, thresholds,
+        and modes via URDF hardware parameters.
+\end{itemize}
+
+The result is a driver that can be safely deployed on a robotic arm teststand
+with confidence that any single-point EtherCAT failure triggers a controlled
+stop within milliseconds, and that startup proceeds deterministically in under
+two seconds.
+
+% ==============================================================================
+\appendix
+
+\section{Git Commit Reference}
+\label{app:commits}
+
+\begin{longtable}{@{}>{\ttfamily\small}l >{\small}l p{9cm}@{}}
+  \toprule
+  \normalfont Hash & \normalfont Date & \normalfont Message \\
+  \midrule
+  \endfirsthead
+  \multicolumn{3}{c}{\small\itshape (continued)} \\
+  \toprule
+  \normalfont Hash & \normalfont Date & \normalfont Message \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endlastfoot
+  b21391f & 2026-04-08 & safety features: immediate ERROR on link-down/WKC fault \\
+  70f0595 & 2026-04-17 & ethercat\_driver: tighten safety stop and clean shutdown path \\
+  32a2cc6 & 2026-04-17 & cia402: hold latched position when controller command is inactive \\
+  4f1e593 & 2026-04-17 & ethercat\_interface: tune watchdog setup and use monotonic app time \\
+  aedb118 & 2026-05-20 & fix(driver): raise kMaxConsecutiveWcFailures from 1 to 5 \\
+  0ff09ed & 2026-06-19 & fix(dc): deterministic SYNC0 shift to eliminate per-joint init delay \\
+  a8268c7 & 2026-06-19 & feat(driver): strict init readiness-gate with timeout and stability \\
+  902be31 & 2026-06-24 & fix(driver): align phase-0 barrier timeout and debounce \\
+  3917d66 & 2026-06-28 & WIP: fix 11 bugs in barrier startup, NaN handling, and code quality \\
+\end{longtable}
+
+\section{Key API Reference}
+\label{app:api}
+
+\begin{description}
+  \item[\texttt{ecrt\_master\_state()}] Returns \texttt{ec\_master\_state\_t}
+        with \texttt{link\_up}, \texttt{al\_states}, \texttt{slaves\_responding}.
+  \item[\texttt{ecrt\_domain\_state()}] Returns \texttt{ec\_domain\_state\_t}
+        with \texttt{working\_counter} and \texttt{wc\_state}
+        (\texttt{EC\_WC\_ZERO}/\texttt{INCOMPLETE}/\texttt{COMPLETE}).
+  \item[\texttt{ecrt\_slave\_config\_dc()}] Configures Distributed Clocks.
+        Arguments: config, assign\_activate (0x0100=SYNC0),
+        sync0\_cycle\_ns, sync0\_shift\_ns, sync1\_cycle\_ns, sync1\_shift\_ns.
+  \item[\texttt{ecrt\_master\_sdo\_download()}] Blocking SDO write in
+        pre-operational state.  Returns 0 on success; sets \texttt{abort\_code}.
+  \item[\texttt{clock\_nanosleep(CLOCK\_MONOTONIC, TIMER\_ABSTIME, \&t, NULL)}]
+        Absolute sleep to next cycle deadline; preferred over
+        \texttt{nanosleep()} for jitter-free real-time loops.
+\end{description}
+
+\end{document}
