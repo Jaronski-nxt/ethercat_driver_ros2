@@ -18,6 +18,7 @@
 #include <ecrt.h>
 
 #include <time.h>
+#include <limits>
 #include <string>
 #include <vector>
 #include <map>
@@ -225,6 +226,8 @@ public:
 
   /** @brief Get expected number of slaves */
   size_t getExpectedSlaves() { return slave_info_.size(); }
+  /** @brief True if a kernel master handle was obtained successfully. */
+  bool hasRequestedMaster() const { return master_ != NULL; }
 
 protected:
   /** @brief Output the memory content of the all the domains
@@ -324,6 +327,11 @@ protected:
 
   /** counter of control loops */
   uint64_t update_counter_ = 0;
+
+  /** Last application time set for DC (monotonic nanoseconds). */
+  uint64_t last_app_time_ns_ = 0;
+  /** Largest absolute cycle jitter observed so far (ns). */
+  uint64_t max_abs_cycle_jitter_ns_ = 0;
 
   /** frequency to check for master or slave state change.
    *  state checked every frequency_ control loops */

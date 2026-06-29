@@ -467,6 +467,12 @@ CallbackReturn EthercatDriver::setupMaster()
     }
   }
   master_ = std::make_shared<ethercat_interface::EcMaster>(master_id);
+  if (!master_->hasRequestedMaster()) {
+    RCLCPP_FATAL(
+      rclcpp::get_logger("EthercatDriver"),
+      "Failed to request EtherCAT master %u. Is another process holding it?", master_id);
+    return CallbackReturn::ERROR;
+  }
 
   return CallbackReturn::SUCCESS;
 }
@@ -745,9 +751,13 @@ CallbackReturn EthercatDriver::on_activate(
   consecutive_wc_failures_ = 0;
 
   // setup master
-  setupMaster();
+  if (setupMaster() != CallbackReturn::SUCCESS) {
+    return CallbackReturn::ERROR;
+  }
   // configure network
-  configNetwork();
+  if (configNetwork() != CallbackReturn::SUCCESS) {
+    return CallbackReturn::ERROR;
+  }
 
   if (!master_->activate()) {
     RCLCPP_ERROR(rclcpp::get_logger("EthercatDriver"), "Activate EcMaster failed");

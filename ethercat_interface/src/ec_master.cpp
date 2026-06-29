@@ -27,9 +27,19 @@
 #include <sstream>
 #include <bitset>
 #include <cstring>
+#include <cstdlib>
 
 namespace ethercat_interface
 {
+
+namespace
+{
+inline uint64_t monotonicTimeToNs(const struct timespec & t)
+{
+  return static_cast<uint64_t>(t.tv_sec) * 1000000000ULL +
+         static_cast<uint64_t>(t.tv_nsec);
+}
+}  // namespace
 
 DomainInfo::DomainInfo(ec_master_t * master)
 {
@@ -149,11 +159,18 @@ void EcMaster::addSlave(EcSlave * slave)
   size_t num_syncs = slave->syncSize();
   const ec_sync_info_t * syncs = slave->syncs();
   if (num_syncs > 0) {
-    // configure pdos in slave
-    int pdos_status = ecrt_slave_config_pdos(slave_info.config, num_syncs, syncs);
-    if (pdos_status) {
-      printWarning("Add slave. Failed to configure PDOs");
-      return;
+    if (slave->configurePdos()) {
+      // Configure PDO assignment/mapping in slave.
+      int pdos_status = ecrt_slave_config_pdos(slave_info.config, num_syncs, syncs);
+      if (pdos_status) {
+        printWarning("Add slave. Failed to configure PDOs");
+        return;
+      }
+    } else {
+      RCLCPP_INFO(
+        rclcpp::get_logger("EthercatDriver"),
+        "Skipping PDO reconfiguration for slave (alias: %u, pos: %u); using slave default PDO map.",
+        slave->alias_, slave->position_);
     }
   } else {
     printWarning(
@@ -257,6 +274,8 @@ void EcMaster::registerPDOInDomain(
 bool EcMaster::activate()
 {
   activated_ = false;
+  last_app_time_ns_ = 0;
+  max_abs_cycle_jitter_ns_ = 0;
   // register domain
   for (auto & iter : domain_info_) {
     DomainInfo * domain_info = iter.second;
@@ -279,7 +298,8 @@ bool EcMaster::activate()
   if (dc_used_) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
-    uint64_t now_ns = EC_NEWTIMEVAL2NANO(t);
+    uint64_t now_ns = monotonicTimeToNs(t);
+    last_app_time_ns_ = now_ns;
     ecrt_master_application_time(master_, now_ns);
 #ifdef EC_HAVE_SYNC_TO
     ecrt_master_sync_reference_clock_to(master_, now_ns);
@@ -373,7 +393,25 @@ void EcMaster::update(uint32_t domain)
   if (dc_used_) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
-    ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
+    const uint64_t now_ns = monotonicTimeToNs(t);
+    if (last_app_time_ns_ != 0) {
+      const int64_t cycle_dt = static_cast<int64_t>(now_ns - last_app_time_ns_);
+      const int64_t jitter = cycle_dt - static_cast<int64_t>(interval_);
+      const uint64_t abs_jitter = static_cast<uint64_t>(std::llabs(jitter));
+      if (abs_jitter > max_abs_cycle_jitter_ns_) {
+        max_abs_cycle_jitter_ns_ = abs_jitter;
+      }
+
+      if ((update_counter_ % 1000) == 0) {
+        const unsigned int wc_state = getDomainWcState(domain);
+        RCLCPP_INFO(
+          rclcpp::get_logger("EthercatDriver"),
+          "DC debug: dt=%ld ns, target=%u ns, jitter=%ld ns, max_abs_jitter=%lu ns, wc_state=%u.",
+          cycle_dt, interval_, jitter, max_abs_cycle_jitter_ns_, wc_state);
+      }
+    }
+    last_app_time_ns_ = now_ns;
+    ecrt_master_application_time(master_, now_ns);
     ecrt_master_sync_reference_clock(master_);
     ecrt_master_sync_slave_clocks(master_);
   }
@@ -437,7 +475,9 @@ void EcMaster::writeData(uint32_t domain)
   if (dc_used_) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
-    ecrt_master_application_time(master_, EC_NEWTIMEVAL2NANO(t));
+    const uint64_t now_ns = monotonicTimeToNs(t);
+    last_app_time_ns_ = now_ns;
+    ecrt_master_application_time(master_, now_ns);
     ecrt_master_sync_reference_clock(master_);
     ecrt_master_sync_slave_clocks(master_);
   }

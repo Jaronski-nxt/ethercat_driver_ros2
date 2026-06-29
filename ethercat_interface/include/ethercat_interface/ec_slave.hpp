@@ -55,6 +55,10 @@ public:
   virtual size_t syncSize() {return 0;}
   /** a pointer to all PDO entries */
   virtual const ec_pdo_entry_info_t * channels() {return NULL;}
+  /** whether the master should push PDO assignment/mapping config for this slave.
+   *  Some slaves expose fixed PDO layout (CoE PDO assign/config disabled) and
+   *  reject remapping; they should return false here while still using PDO I/O. */
+  virtual bool configurePdos() {return true;}
   /** a map from domain index to pdo indices in that domain.
   *  map<domain index, vector<channels_ indices> > */
   typedef std::map<unsigned int, std::vector<unsigned int>> DomainMap;
