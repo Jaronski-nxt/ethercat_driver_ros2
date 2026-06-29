@@ -539,6 +539,24 @@ CallbackReturn EthercatDriver::configNetwork()
       return CallbackReturn::ERROR;
     }
   }
+  if (info_.hardware_parameters.find("sync_timeout") != info_.hardware_parameters.end()) {
+    try {
+      sync_timeout_ = std::stod(info_.hardware_parameters["sync_timeout"]);
+    } catch (std::exception & e) {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"), "Invalid sync_timeout (%s)!", e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
+  if (info_.hardware_parameters.find("max_sync_jitter_ns") != info_.hardware_parameters.end()) {
+    try {
+      max_sync_jitter_ns_ = std::stoull(info_.hardware_parameters["max_sync_jitter_ns"]);
+    } catch (std::exception & e) {
+      RCLCPP_FATAL(
+        rclcpp::get_logger("EthercatDriver"), "Invalid max_sync_jitter_ns (%s)!", e.what());
+      return CallbackReturn::ERROR;
+    }
+  }
   if (info_.hardware_parameters.find("phase_stable_cycles") != info_.hardware_parameters.end()) {
     try {
       phase_stable_cycles_ = std::stoi(info_.hardware_parameters["phase_stable_cycles"]);
@@ -619,117 +637,106 @@ CallbackReturn EthercatDriver::configNetwork()
 
 CallbackReturn EthercatDriver::runBarrierStartup()
 {
-  // Deterministic startup gate for phase 0.
-  // Phase 0 (SWITCH_ON_DISABLED) is the "wait for the whole bus" gate: every
-  // drive that becomes bus-OP is HELD at SWITCH_ON_DISABLED until the ENTIRE
-  // bus is OP (domain WC COMPLETE and every drive at least SWITCH_ON_DISABLED).
-  // Once this gate is released, each drive can continue its own CiA402
-  // transitions naturally. Without phase 0 each drive raced ahead as soon as
-  // it individually reached bus-OP (serial power-up).
-  constexpr int kStateSwitchOnDisabled = 3;  // DeviceState enum value
-  const int phases[] = {kStateSwitchOnDisabled};
-  const char * phase_names[] = {"SWITCH_ON_DISABLED"};
+  // Phased deterministic startup. Drives are HELD at SWITCH_ON_DISABLED by the
+  // barrier through phases A and B, so no CiA402 transitions race the bus.
+  //   Phase A (DC-Sync/OP): wait for WC_COMPLETE + every drive bus-OP. Covers
+  //                         the serial SAFEOP->OP ramp of the IgH master.
+  //   Phase B (bus-stable):  N consecutive cycles WC_COMPLETE + jitter < thresh.
+  //   Phase C (CiA402):      barrier released; on_activate init loop drives the
+  //                          state machine to OPERATION_ENABLED.
+  constexpr int kStateSwitchOnDisabled = 3;
+  constexpr int target_rank = 0;
 
   RCLCPP_INFO(
     rclcpp::get_logger("EthercatDriver"),
-    "Barrier startup: phase-0 bus gate (phase_timeout=%.1fs, "
-    "stable_cycles=%d).", phase_timeout_, phase_stable_cycles_);
+    "Barrier startup: phase A=DC-sync/OP (sync_timeout=%.1fs), "
+    "phase B=bus-stable (phase_timeout=%.1fs, stable=%d, max_jitter=%lu ns).",
+    sync_timeout_, phase_timeout_, phase_stable_cycles_, max_sync_jitter_ns_);
+
+  // Arm the barrier on every drive: hold at SWITCH_ON_DISABLED until released.
+  for (auto & module : ec_modules_) {
+    if (module->cia402State() >= 0) {
+      module->setStartupBarrier(true, kStateSwitchOnDisabled);
+    }
+  }
 
   struct timespec t;
   clock_gettime(CLOCK_MONOTONIC, &t);
   t.tv_nsec += master_->getInterval();
-  while (t.tv_nsec >= 1000000000) {
-    t.tv_nsec -= 1000000000;
-    t.tv_sec++;
-  }
+  while (t.tv_nsec >= 1000000000) {t.tv_nsec -= 1000000000; t.tv_sec++;}
 
-  // Phase 0: hold all drives at SWITCH_ON_DISABLED until the bus is fully up
-  // (domain WC COMPLETE). After that, release the barrier and let each drive
-  // transition freely through CiA402 on its own.
-  constexpr int target_rank = 0;  // rank of SWITCH_ON_DISABLED on the power-up path
-  for (size_t p = 0; p < 1; ++p) {
-    const int target = phases[p];
-    const double this_phase_timeout = phase_timeout_;
-
-    // Arm the barrier on every drive for this phase target.
+  auto bus_op = [&]() -> bool {
+    bool ok = (master_->getDomainWcState(0) == EC_WC_COMPLETE);
     for (auto & module : ec_modules_) {
-      if (module->cia402State() >= 0) {
-        module->setStartupBarrier(true, target);
-      }
+      if (module->cia402State() < 0) {continue;}
+      const int rank = module->cia402PowerupRank();
+      ok = ok && (rank >= 0) && (rank >= target_rank);
     }
+    return ok;
+  };
 
-    struct timespec t_phase_start;
-    clock_gettime(CLOCK_MONOTONIC, &t_phase_start);
-    int stable_cycles = 0;
-    bool phase_running = true;
-
-    while (phase_running) {
+  // ---- Phase A: DC-sync / OP convergence ----
+  {
+    struct timespec t0; clock_gettime(CLOCK_MONOTONIC, &t0);
+    while (true) {
       clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, NULL);
       master_->update();
-
-      // The whole group must reach (or pass) the phase target with a healthy
-      // bus before we advance. Non-drive slaves (cia402State()<0) are ignored.
-      bool all_at_target = (master_->getDomainWcState(0) == EC_WC_COMPLETE);
-      for (auto & module : ec_modules_) {
-        if (module->cia402State() < 0) {continue;}  // non-drive slave
-        const int rank = module->cia402PowerupRank();
-        all_at_target = all_at_target && (rank >= 0) && (rank >= target_rank);
-      }
-
-      stable_cycles = all_at_target ? (stable_cycles + 1) : 0;
-      if (stable_cycles >= phase_stable_cycles_) {
-        phase_running = false;
-      }
-
-      struct timespec now;
-      clock_gettime(CLOCK_MONOTONIC, &now);
-      double elapsed = (now.tv_sec - t_phase_start.tv_sec) +
-        (now.tv_nsec - t_phase_start.tv_nsec) * 1e-9;
-      if (phase_running && elapsed > this_phase_timeout) {
+      if (bus_op()) {break;}
+      struct timespec now; clock_gettime(CLOCK_MONOTONIC, &now);
+      double el = (now.tv_sec - t0.tv_sec) + (now.tv_nsec - t0.tv_nsec) * 1e-9;
+      if (el > sync_timeout_) {
         RCLCPP_ERROR(
           rclcpp::get_logger("EthercatDriver"),
-          "Barrier startup TIMEOUT in phase '%s' after %.1f s (limit %.1f s). "
-          "Domain WC state: %u (need %u=COMPLETE). Drives not at target:",
-          phase_names[p], elapsed, this_phase_timeout,
-          master_->getDomainWcState(0), static_cast<unsigned int>(EC_WC_COMPLETE));
+          "Phase A (DC-sync/OP) TIMEOUT after %.1f s (limit %.1f s). WC=%u (need %u). Not bus-OP:",
+          el, sync_timeout_, master_->getDomainWcState(0),
+          static_cast<unsigned int>(EC_WC_COMPLETE));
         for (size_t i = 0; i < ec_modules_.size(); ++i) {
-          auto & module = ec_modules_[i];
-          if (module->cia402State() < 0) {continue;}
-          const int rank = module->cia402PowerupRank();
-          if (rank < 0 || rank < target_rank) {
-            RCLCPP_ERROR(
-              rclcpp::get_logger("EthercatDriver"),
-              "  Module %zu (alias %u, pos %u): %s",
-              i, module->alias_, module->position_, module->statusString().c_str());
+          auto & m = ec_modules_[i];
+          if (m->cia402State() < 0) {continue;}
+          if (m->cia402PowerupRank() < target_rank) {
+            RCLCPP_ERROR(rclcpp::get_logger("EthercatDriver"),
+              "  Module %zu (alias %u, pos %u): %s", i, m->alias_, m->position_,
+              m->statusString().c_str());
           }
         }
-        // Disarm the barrier so deactivate()/error handling is unrestricted.
-        for (auto & module : ec_modules_) {
-          if (module->cia402State() >= 0) {
-            module->setStartupBarrier(false, 0);  // target unused when disarming
-          }
-        }
+        for (auto & m : ec_modules_) {if (m->cia402State() >= 0) {m->setStartupBarrier(false, 0);}}
         return CallbackReturn::ERROR;
       }
-
       t.tv_nsec += master_->getInterval();
-      while (t.tv_nsec >= 1000000000) {
-        t.tv_nsec -= 1000000000;
-        t.tv_sec++;
-      }
+      while (t.tv_nsec >= 1000000000) {t.tv_nsec -= 1000000000; t.tv_sec++;}
     }
-
-    RCLCPP_INFO(
-      rclcpp::get_logger("EthercatDriver"),
-      "Barrier startup: all drives reached '%s'.", phase_names[p]);
+    RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Phase A done: bus OP + WC COMPLETE.");
   }
 
-  // Power-up complete — disarm the barrier so normal runtime control is fully
-  // unrestricted (and fault recovery can drive the state machine freely).
-  for (auto & module : ec_modules_) {
-    if (module->cia402State() >= 0) {
-      module->setStartupBarrier(false, 0);  // target unused when disarming
+  // ---- Phase B: bus-stable gate (DC jitter under threshold) ----
+  {
+    struct timespec t0; clock_gettime(CLOCK_MONOTONIC, &t0);
+    int stable = 0;
+    while (stable < phase_stable_cycles_) {
+      clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, NULL);
+      master_->update();
+      const uint64_t j = master_->getLastCycleJitterNs();
+      const bool ok = bus_op() && (j <= max_sync_jitter_ns_);
+      stable = ok ? (stable + 1) : 0;
+      struct timespec now; clock_gettime(CLOCK_MONOTONIC, &now);
+      double el = (now.tv_sec - t0.tv_sec) + (now.tv_nsec - t0.tv_nsec) * 1e-9;
+      if (el > phase_timeout_) {
+        RCLCPP_ERROR(
+          rclcpp::get_logger("EthercatDriver"),
+          "Phase B (bus-stable) TIMEOUT after %.1f s (limit %.1f s). last_jitter=%lu ns (max %lu), WC=%u.",
+          el, phase_timeout_, j, max_sync_jitter_ns_, master_->getDomainWcState(0));
+        for (auto & m : ec_modules_) {if (m->cia402State() >= 0) {m->setStartupBarrier(false, 0);}}
+        return CallbackReturn::ERROR;
+      }
+      t.tv_nsec += master_->getInterval();
+      while (t.tv_nsec >= 1000000000) {t.tv_nsec -= 1000000000; t.tv_sec++;}
     }
+    RCLCPP_INFO(rclcpp::get_logger("EthercatDriver"), "Phase B done: bus stable, releasing barrier.");
+  }
+
+  // ---- Phase C: release barrier -> on_activate runs CiA402 to OPERATION_ENABLED ----
+  for (auto & module : ec_modules_) {
+    if (module->cia402State() >= 0) {module->setStartupBarrier(false, 0);}
   }
   return CallbackReturn::SUCCESS;
 }
@@ -744,8 +751,8 @@ CallbackReturn EthercatDriver::on_activate(
   }
   RCLCPP_INFO(
     rclcpp::get_logger("EthercatDriver"),
-    "Starting ...please wait... (max %.0f s barrier + %.0f s init = %.0f s total)",
-    phase_timeout_, init_timeout_, phase_timeout_ + init_timeout_);
+    "Starting ...please wait... (phaseA sync %.0fs + phaseB stable %.0fs + phaseC init %.0fs = %.0fs total)",
+    sync_timeout_, phase_timeout_, init_timeout_, sync_timeout_ + phase_timeout_ + init_timeout_);
 
   // Reset WC error counter
   consecutive_wc_failures_ = 0;

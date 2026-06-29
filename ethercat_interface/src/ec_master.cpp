@@ -276,6 +276,7 @@ bool EcMaster::activate()
   activated_ = false;
   last_app_time_ns_ = 0;
   max_abs_cycle_jitter_ns_ = 0;
+  last_cycle_jitter_ns_ = 0;
   // register domain
   for (auto & iter : domain_info_) {
     DomainInfo * domain_info = iter.second;
@@ -398,6 +399,7 @@ void EcMaster::update(uint32_t domain)
       const int64_t cycle_dt = static_cast<int64_t>(now_ns - last_app_time_ns_);
       const int64_t jitter = cycle_dt - static_cast<int64_t>(interval_);
       const uint64_t abs_jitter = static_cast<uint64_t>(std::llabs(jitter));
+      last_cycle_jitter_ns_ = abs_jitter;
       if (abs_jitter > max_abs_cycle_jitter_ns_) {
         max_abs_cycle_jitter_ns_ = abs_jitter;
       }
@@ -810,6 +812,15 @@ uint8_t EcMaster::getMasterAlStates()
   ec_master_state_t ms;
   ecrt_master_state(master_, &ms);
   return ms.al_states;
+}
+bool EcMaster::allSlavesOperational()
+{
+  if (master_ == NULL) {
+    return false;
+  }
+  ec_master_state_t ms;
+  ecrt_master_state(master_, &ms);
+  return ms.al_states == 0x08;
 }
 
 bool EcMaster::isMasterLinkUp()

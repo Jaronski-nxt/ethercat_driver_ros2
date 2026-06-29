@@ -217,6 +217,10 @@ public:
 
   /** @brief Get current master AL states */
   uint8_t getMasterAlStates();
+  /** @brief True if every slave AL state is OP (master AL bitmask == 0x08). */
+  bool allSlavesOperational();
+  /** @brief Most recent absolute cycle jitter (ns); 0 until first DC cycle. */
+  uint64_t getLastCycleJitterNs() const {return last_cycle_jitter_ns_;}
 
   /** @brief Check if link is up */
   bool isMasterLinkUp();
@@ -332,6 +336,8 @@ protected:
   uint64_t last_app_time_ns_ = 0;
   /** Largest absolute cycle jitter observed so far (ns). */
   uint64_t max_abs_cycle_jitter_ns_ = 0;
+  /** Most recent absolute cycle jitter (ns), updated each DC cycle. */
+  uint64_t last_cycle_jitter_ns_ = 0;
 
   /** frequency to check for master or slave state change.
    *  state checked every frequency_ control loops */

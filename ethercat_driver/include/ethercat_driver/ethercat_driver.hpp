@@ -163,6 +163,13 @@ protected:
    *  (with WC COMPLETE) before the group advances. Hardware parameter
    *  "phase_stable_cycles"; default 10. */
   int phase_stable_cycles_ = 10;
+  /** Separate timeout (seconds) for phase A (DC-sync/OP convergence): wait for
+   *  WC_COMPLETE + every drive bus-OP. Hardware parameter "sync_timeout";
+   *  default 30 s (covers serial SAFEOP->OP ramp of the IgH master). */
+  double sync_timeout_ = 30.0;
+  /** Max accepted last-cycle DC jitter (ns) for the phase B bus-stable gate.
+   *  Hardware parameter "max_sync_jitter_ns"; default 100000 ns (100 us). */
+  uint64_t max_sync_jitter_ns_ = 100000;
   /** When true, read() supervises every CiA402 drive each cycle and triggers a
    *  group stop if any drive leaves OPERATION_ENABLED / loses a valid position.
    *  Hardware parameter "runtime_drive_supervision"; default true. Set to
