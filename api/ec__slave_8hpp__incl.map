@@ -1,13 +1,26 @@
 <map id="/home/runner/work/ethercat_driver_ros2/ethercat_driver_ros2/ethercat_interface/include/ethercat_interface/ec_slave.hpp" name="/home/runner/work/ethercat_driver_ros2/ethercat_driver_ros2/ethercat_interface/include/ethercat_interface/ec_slave.hpp">
-<area shape="rect" id="node1" title=" " alt="" coords="272,5,507,76"/>
-<area shape="rect" id="node2" title=" " alt="" coords="5,213,64,240"/>
-<area shape="rect" id="node3" title=" " alt="" coords="396,131,447,158"/>
-<area shape="rect" id="node4" title=" " alt="" coords="89,213,151,240"/>
-<area shape="rect" id="node5" title=" " alt="" coords="471,131,595,158"/>
-<area shape="rect" id="node6" title=" " alt="" coords="620,131,700,158"/>
-<area shape="rect" id="node7" title=" " alt="" coords="725,131,787,158"/>
-<area shape="rect" id="node8" title=" " alt="" coords="415,213,473,240"/>
-<area shape="rect" id="node9" href="$ec__sdo__manager_8hpp.html" title=" " alt="" coords="159,124,321,165"/>
-<area shape="rect" id="node10" title=" " alt="" coords="332,213,391,240"/>
-<area shape="rect" id="node11" title=" " alt="" coords="175,213,307,240"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="272,5,507,75"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,211,64,236"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="273,64,195,88,157,105,121,125,100,142,81,161,51,200,47,197,77,158,96,138,119,120,155,100,193,83,271,59"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="396,130,447,155"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="403,74,416,116,411,117,398,76"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="89,211,151,236"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="272,59,239,69,206,83,175,102,149,124,137,141,130,160,123,197,118,196,124,158,132,138,145,121,172,97,203,79,237,64,271,54"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="471,130,595,155"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="439,73,507,120,504,125,436,77"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="620,130,700,155"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="481,72,617,123,615,128,479,77"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="725,130,787,155"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="507,64,608,89,713,120,719,122,718,128,711,125,607,94,506,69"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="415,211,473,236"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="383,75,379,118,380,140,386,162,400,183,417,200,413,204,395,186,382,164,375,141,373,118,378,75"/>
+<area shape="rect" id="Node000009" href="$ec__sdo__manager_8hpp.html" title=" " alt="" coords="159,123,321,163"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="341,77,281,117,278,113,338,73"/>
+<area shape="poly" id="edge9_Node000009_Node000002" title=" " alt="" coords="192,165,78,208,76,203,190,160"/>
+<area shape="poly" id="edge11_Node000009_Node000004" title=" " alt="" coords="212,165,151,205,148,201,209,161"/>
+<area shape="poly" id="edge10_Node000009_Node000008" title=" " alt="" coords="290,160,403,203,401,208,288,165"/>
+<area shape="rect" id="Node000010" title=" " alt="" coords="332,211,391,236"/>
+<area shape="poly" id="edge12_Node000009_Node000010" title=" " alt="" coords="271,161,333,201,331,205,268,165"/>
+<area shape="rect" id="Node000011" title=" " alt="" coords="175,211,307,236"/>
+<area shape="poly" id="edge13_Node000009_Node000011" title=" " alt="" coords="243,163,244,197,238,197,238,163"/>
 </map>

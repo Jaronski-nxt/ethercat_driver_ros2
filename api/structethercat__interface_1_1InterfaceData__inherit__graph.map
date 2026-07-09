@@ -1,0 +1,7 @@
+<map id="ethercat_interface::InterfaceData" name="ethercat_interface::InterfaceData">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,49,147,89"/>
+<area shape="rect" id="Node000002" href="$classethercat__interface_1_1EcPdoSingleInterfaceChannelManager.html" title="Class to manage a PDO channel corresponding to a single interface." alt="" coords="195,5,415,60"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="160,53,194,47,195,53,161,58"/>
+<area shape="rect" id="Node000003" href="$structethercat__interface_1_1InterfaceDataWithAddrOffset.html" title=" " alt="" coords="195,85,414,125"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="161,79,196,85,195,90,160,84"/>
+</map>

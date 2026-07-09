@@ -1,0 +1,212 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How domain construction is done &mdash; ethercat_driver_ros2 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=687e9a7b" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=888ff710"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            ethercat_driver_ros2
+              <img src="../_static/logo-icube.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Quickstart</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/usage.html">Usage</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/config_generic_slave.html">Generic EtherCAT Slave configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/config_cia402_drive.html">CiA402 EtherCAT Motor Drive configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/config_use_case_motor_with_gear_box.html">Case study: motor coupled to a gearbox and a transmission screw with an encoder</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/sdo_async_com.html">SDO acyclic exchange using ROS2 services</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="coe.html">CANopen over EtherCAT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cia402_drive.html">CANopen over EtherCAT for electrical drives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="new_plugin.html">Creating a new device driver</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://ICube-Robotics.github.io/ethercat_driver_ros2/api/">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">ethercat_driver_ros2</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">How domain construction is done</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/developer_guide/domain_construction.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="how-domain-construction-is-done">
+<h1>How domain construction is done<a class="headerlink" href="#how-domain-construction-is-done" title="Link to this heading"></a></h1>
+<section id="interface-between-the-master-and-the-application">
+<h2>Interface between the master and the application<a class="headerlink" href="#interface-between-the-master-and-the-application" title="Link to this heading"></a></h2>
+<p>The link between the data used by the application and the one that transit on the EtherCAT network as EtherCAT frames is explicitly provided via the definition of domains.
+Domains are contiguous memory areas that transit on the EtherCAT network.</p>
+<p>This mapping is provided to the application as offsets inside the communication frames in the domains.
+For instance, is a 32bit integer is used by the application, the application got a pointer <span class="math notranslate nohighlight">\(\text{pd}\)</span> to the start of the domain and an offset <span class="math notranslate nohighlight">\(o\)</span> that give the pointer <span class="math notranslate nohighlight">\(p\)</span> to the first octet of the integer via pointer arithmetic: <span class="math notranslate nohighlight">\(\text{p} = \text{pd} + o\)</span>.</p>
+<p>The application has access to objects of type <code class="code docutils literal notranslate"><span class="pre">ec_pdo_entry_reg_t</span></code> (IgH master data structures) that contains the information to access the data in the domain:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">alias</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Slave alias address. */</span>
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">position</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Slave position. */</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">vendor_id</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Slave vendor ID. */</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">product_code</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Slave product code. */</span>
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">index</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; PDO entry index. */</span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">subindex</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; PDO entry subindex. */</span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="o">*</span><span class="n">offset</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Pointer to a variable to store the PDO entry&#39;s</span>
+<span class="cm">                   (byte-)offset in the process data. */</span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="o">*</span><span class="n">bit_position</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Pointer to a variable to store a bit</span>
+<span class="cm">                              position (0-7) within the \a offset. Can be</span>
+<span class="cm">                              NULL, in which case an error is raised if the</span>
+<span class="cm">                              PDO entry does not byte-align. */</span>
+<span class="p">}</span><span class="w"> </span><span class="n">ec_pdo_entry_reg_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>In this structure the <code class="code docutils literal notranslate"><span class="pre">offset</span></code> and <code class="code docutils literal notranslate"><span class="pre">bit_position</span></code> are pointers to the offset and bit position of the data in the domain because this structure is given to the master that fill in those values establishing the link for the application with its data.</p>
+<p>The application configures its link with the EtherCAT master via separate API calls.
+It first creates domains with:
+1. <code class="code docutils literal notranslate"><span class="pre">ec_domain_t</span> <span class="pre">*</span> <span class="pre">ecrt_master_create_domain(const</span> <span class="pre">ec_master_t</span> <span class="pre">*master)</span></code>
+Then it provides the master with:
+2. the list of slaves that are used in the domain</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">ec_slave_config_t</span><span class="w"> </span><span class="o">*</span><span class="nf">ecrt_master_slave_config</span><span class="p">(</span>
+<span class="w">    </span><span class="n">ec_master_t</span><span class="w"> </span><span class="o">*</span><span class="n">master</span><span class="p">,</span><span class="w"> </span><span class="cm">/**&lt; EtherCAT master */</span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">alias</span><span class="p">,</span><span class="w"> </span><span class="cm">/**&lt; Slave alias. */</span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">position</span><span class="p">,</span><span class="w"> </span><span class="cm">/**&lt; Slave position. */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">vendor_id</span><span class="p">,</span><span class="w"> </span><span class="cm">/**&lt; Expected vendor ID. */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">product_code</span><span class="w"> </span><span class="cm">/**&lt; Expected product code. */</span>
+<span class="w">    </span><span class="p">);</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p>the list of PDO entries that are used in the domain, via an array of <code class="code docutils literal notranslate"><span class="pre">ec_pdo_entry_reg_t</span></code> objects, where offset and bit_position points to the data the application will use and have to be filled by the master: <code class="code docutils literal notranslate"><span class="pre">bool</span> <span class="pre">ecrt_domain_reg_pdo_entry_list(ec_domain_t</span> <span class="pre">*domain,</span> <span class="pre">ec_pdo_entry_reg_t</span> <span class="pre">*entries)</span></code></p></li>
+<li><p>It asks for pointer to the start of the domain memory: <code class="code docutils literal notranslate"><span class="pre">uint8_t</span> <span class="pre">*</span> <span class="pre">ecrt_domain_data(ec_domain_t</span> <span class="pre">*domain)</span></code></p></li>
+</ol>
+<p>One domain can be used for read and one for writing data for instance, so the application may make several calls to the above functions to create the domains it needs.</p>
+</section>
+<section id="ethercat-driver-ros2-data-structure-organization">
+<h2>ethercat_driver_ros2 data structure organization<a class="headerlink" href="#ethercat-driver-ros2-data-structure-organization" title="Link to this heading"></a></h2>
+<p>The library keeps a representation of the masters used as <code class="code docutils literal notranslate"><span class="pre">EcMaster</span></code> objects.
+Each <code class="code docutils literal notranslate"><span class="pre">EcMaster</span></code> object keeps a collection of domain configurations as <code class="code docutils literal notranslate"><span class="pre">DomainInfo</span></code> objects organised in a map with the domain index as key.
+In a <code class="code docutils literal notranslate"><span class="pre">DomainInfo</span></code> a vector of <code class="code docutils literal notranslate"><span class="pre">ec_pdo_entry_reg_t</span></code> objects is kept that records the PDO entries used by the application with the links/offsets into that domain data.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">DomainInfo</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">explicit</span><span class="w"> </span><span class="n">DomainInfo</span><span class="p">(</span><span class="n">ec_master_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">master</span><span class="p">);</span>
+<span class="w">    </span><span class="o">~</span><span class="n">DomainInfo</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">ec_domain_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">domain</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="n">ec_domain_state_t</span><span class="w"> </span><span class="n">domain_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{};</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">domain_pd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+<span class="w">    </span><span class="cm">/** domain pdo registration array.</span>
+<span class="cm">        *  do not modify after active(), or may invalidate */</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">ec_pdo_entry_reg_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">domain_regs</span><span class="p">;</span>
+
+<span class="w">    </span><span class="cm">/** slave&#39;s pdo entries in the domain */</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">Entry</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">EcSlave</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">slave</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">num_pdos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">bit_position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Entry</span><span class="o">&gt;</span><span class="w"> </span><span class="n">entries</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">EcMaster</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">...</span>
+<span class="w">    </span><span class="n">ec_master_t</span><span class="w"> </span><span class="o">*</span><span class="n">master</span><span class="p">;</span>
+<span class="w">    </span><span class="p">...</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">map</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="n">DomainInfo</span><span class="o">&gt;</span><span class="w"> </span><span class="n">domains</span><span class="p">;</span>
+<span class="w">    </span><span class="p">...</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>All the <code class="code docutils literal notranslate"><span class="pre">DomainInfo</span></code> data structures are created during the calls to the <code class="code docutils literal notranslate"><span class="pre">addSlave</span></code> method of the <code class="code docutils literal notranslate"><span class="pre">EcMaster</span></code> object. <code class="code docutils literal notranslate"><span class="pre">ec_pdo_entry_reg_t</span></code> objects are effectively created by <code class="code docutils literal notranslate"><span class="pre">addSlave</span></code> with a call of the <code class="code docutils literal notranslate"><span class="pre">registerPDOInDomain</span></code> method.</p>
+<p>The link is made at the <code class="code docutils literal notranslate"><span class="pre">on_activate</span></code> stage of the hardware interface life-cycle in ros2 control.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, ICUBE Laboratory, University of Strasbourg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

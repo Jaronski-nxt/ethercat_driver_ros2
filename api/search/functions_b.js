@@ -1,15 +1,9 @@
 var searchData=
 [
-  ['sdoconfigentry_147',['SdoConfigEntry',['../classethercat__interface_1_1SdoConfigEntry.html#aeabdb7660bdb2da4f8ab8be553c3eaa6',1,'ethercat_interface::SdoConfigEntry']]],
-  ['set_5fstate_5fis_5foperational_148',['set_state_is_operational',['../classethercat__interface_1_1EcSlave.html#a7bc12713b7a55e449cad34ba45ea11b0',1,'ethercat_interface::EcSlave']]],
-  ['setctrlchandler_149',['setCtrlCHandler',['../classethercat__interface_1_1EcMaster.html#a5595fd19001fba2d154ac1a062fd954d',1,'ethercat_interface::EcMaster']]],
-  ['setctrlfrequency_150',['setCtrlFrequency',['../classethercat__interface_1_1EcMaster.html#ab1378914bbffd1abd5021ff7a962a2da',1,'ethercat_interface::EcMaster']]],
-  ['setthreadhighpriority_151',['setThreadHighPriority',['../classethercat__interface_1_1EcMaster.html#ae10eca5831ac34b427187e776d624009',1,'ethercat_interface::EcMaster']]],
-  ['setthreadrealtime_152',['setThreadRealTime',['../classethercat__interface_1_1EcMaster.html#a758bacd951c257801f03e0c935600a58',1,'ethercat_interface::EcMaster']]],
-  ['setup_5finterface_5fptrs_153',['setup_interface_ptrs',['../classethercat__interface_1_1EcPdoChannelManager.html#a027526b74dc4f4469c91be9b5ec09af4',1,'ethercat_interface::EcPdoChannelManager']]],
-  ['setupslave_154',['setupSlave',['../classethercat__interface_1_1EcSlave.html#ae3b7e6ff047cc99c1fe1861414d57126',1,'ethercat_interface::EcSlave']]],
-  ['smconfig_155',['SMConfig',['../classethercat__interface_1_1SMConfig.html#a455385f10d632f3bd37da61c85197393',1,'ethercat_interface::SMConfig']]],
-  ['stop_156',['stop',['../classethercat__interface_1_1EcMaster.html#ae8988721db331d7997b0794644a01656',1,'ethercat_interface::EcMaster']]],
-  ['syncs_157',['syncs',['../classethercat__interface_1_1EcSlave.html#a9daa41f8d0fef6c3a8b2d303725e1240',1,'ethercat_interface::EcSlave']]],
-  ['syncsize_158',['syncSize',['../classethercat__interface_1_1EcSlave.html#a72176e704896442a31d10fbc3055ba45',1,'ethercat_interface::EcSlave']]]
+  ['pdo_5fbits_0',['pdo_bits',['../classethercat__interface_1_1EcPdoChannelManager.html#a86ce950e5f61d418425b6e2c948a7afa',1,'ethercat_interface::EcPdoChannelManager']]],
+  ['pdo_5fdata_5ftype_1',['pdo_data_type',['../classethercat__interface_1_1EcPdoChannelManager.html#a8bbe08e7529340f79b72f138e353f8d0',1,'ethercat_interface::EcPdoChannelManager']]],
+  ['printmemoryframe_2',['printMemoryFrame',['../classethercat__interface_1_1EcMaster.html#aeaf189be108cdb5289e49f058e88d77b',1,'ethercat_interface::EcMaster']]],
+  ['printmemoryframes_3',['printMemoryFrames',['../classethercat__interface_1_1EcMaster.html#a0768017646f5912d57c68ecc76842f17',1,'ethercat_interface::EcMaster']]],
+  ['printwarning_4',['printWarning',['../classethercat__interface_1_1EcMaster.html#aceb3d8a27e6c88f60d417d4a1f7959b0',1,'ethercat_interface::EcMaster']]],
+  ['processdata_5',['processData',['../classethercat__interface_1_1EcSlave.html#a4b425c22f8128ed1c1b3fa779a44fde4',1,'ethercat_interface::EcSlave']]]
 ];

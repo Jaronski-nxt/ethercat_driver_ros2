@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['simplecat_5fcontrl_5fcallback_197',['SIMPLECAT_CONTRL_CALLBACK',['../classethercat__interface_1_1EcMaster.html#a73bc5c856a72094e11a8003224d8466c',1,'ethercat_interface::EcMaster']]],
-  ['simplecat_5fexit_5fcallback_198',['SIMPLECAT_EXIT_CALLBACK',['../classethercat__interface_1_1EcMaster.html#ac96aab8a65ca59ff5f4721416fcd5a4e',1,'ethercat_interface::EcMaster']]]
+  ['simplecat_5fcontrl_5fcallback_0',['SIMPLECAT_CONTRL_CALLBACK',['../classethercat__interface_1_1EcMaster.html#a73bc5c856a72094e11a8003224d8466c',1,'ethercat_interface::EcMaster']]],
+  ['simplecat_5fexit_5fcallback_1',['SIMPLECAT_EXIT_CALLBACK',['../classethercat__interface_1_1EcMaster.html#ac96aab8a65ca59ff5f4721416fcd5a4e',1,'ethercat_interface::EcMaster']]],
+  ['singlereadfunctiontype_2',['SingleReadFunctionType',['../namespaceethercat__interface.html#a22250355063916923714035b7f6d5e18',1,'ethercat_interface']]],
+  ['singlewritefunctiontype_3',['SingleWriteFunctionType',['../namespaceethercat__interface.html#ae3d0f8d548116327ebc5560f12a2b165',1,'ethercat_interface']]]
 ];

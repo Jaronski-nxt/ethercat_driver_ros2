@@ -1,0 +1,197 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FailSafe over EtherCAT (FSoE) : Safety and the Ethercat Driver for ROS2 &mdash; ethercat_driver_ros2 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=687e9a7b" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=888ff710"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            ethercat_driver_ros2
+              <img src="../_static/logo-icube.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Quickstart</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/usage.html">Usage</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/config_generic_slave.html">Generic EtherCAT Slave configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/config_cia402_drive.html">CiA402 EtherCAT Motor Drive configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/config_use_case_motor_with_gear_box.html">Case study: motor coupled to a gearbox and a transmission screw with an encoder</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/sdo_async_com.html">SDO acyclic exchange using ROS2 services</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="coe.html">CANopen over EtherCAT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cia402_drive.html">CANopen over EtherCAT for electrical drives</a></li>
+<li class="toctree-l1"><a class="reference internal" href="new_plugin.html">Creating a new device driver</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://ICube-Robotics.github.io/ethercat_driver_ros2/api/">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">ethercat_driver_ros2</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">FailSafe over EtherCAT (FSoE) : Safety and the Ethercat Driver for ROS2</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/developer_guide/safety.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="failsafe-over-ethercat-fsoe-safety-and-the-ethercat-driver-for-ros2">
+<h1>FailSafe over EtherCAT (FSoE) : Safety and the Ethercat Driver for ROS2<a class="headerlink" href="#failsafe-over-ethercat-fsoe-safety-and-the-ethercat-driver-for-ros2" title="Link to this heading"></a></h1>
+<p>In order to have safe robotic systems, it is important to have a safety layer that can monitor the system and take action in case of a failure. The FailSafe over EtherCAT (FSoE) protocol is a safety protocol that can be used to monitor the system and take action in case of a failure.
+In order to use the FSoE protocol with ROS2, the Ethercat Driver for ROS2 has been extended to be compatible with EtherCAT communications using the FSoE protocol.</p>
+<p>This document describes the integration of FSoE communications in the Ethercat Driver for ROS2 and how to use it to monitor the system and take action in case of a failure.</p>
+<p>In addition to the standard EtherCAT slaves, safety is implemented by adding safety slaves and safety masters to the EtherCAT network, all being «viewed» by the EtherCAT master as standard slaves.
+One safety master handles a set of safety slaves creating a safety sub-network within the EtherCAT network.
+All the communications between the safety slaves and their respective safety masters are done inside the standard EtherCAT frames and must not be tampered with or an error will be raised.
+The ethercat_driver_ros2 package has been extended:</p>
+<ol class="arabic simple">
+<li><p>to be able to record safety slaves and safety masters in the ros2_control URDF configuration file</p></li>
+<li><p>to extend communication frames to include safety data</p></li>
+<li><p>to handle safety data transfer between safety slaves and safety masters.</p></li>
+</ol>
+<section id="safety-module-declaration">
+<h2>Safety module declaration<a class="headerlink" href="#safety-module-declaration" title="Link to this heading"></a></h2>
+<p>There are 2 types of safety slaves or masters:</p>
+<ol class="arabic simple">
+<li><p>the ones that expose safety data to ROS2 and will be either joints, sensors or gpios, we call them «ros2 safety» slaves or masters.</p></li>
+<li><p>the ones that are not visible to ROS2, we call them «safety only» slaves or masters.</p></li>
+</ol>
+<p>The «ros2 safety» slaves or masters are declared in the URDF configuration file as usual inside the gpio, sensor or joint tags.</p>
+<p>The «safety only» slaves or masters are declared in the URDF configuration file in a new tag called «safety», inside standard «ec_module» tags.</p>
+<p>For each FSoE net, a «net» tag is added as a child of the «safety» tag. The «net» tag has a the following attributes:</p>
+<ol class="arabic simple">
+<li><p>a «name» attribute,</p></li>
+<li><p>a «safety_master» attribute providing the name of an «ec_module» that will act as the net safety master.</p></li>
+</ol>
+<p>The «net» tag has children «transfer» tags describing the safety data transfers.</p>
+</section>
+<section id="safety-data-transfer-specification">
+<h2>Safety data transfer specification<a class="headerlink" href="#safety-data-transfer-specification" title="Link to this heading"></a></h2>
+<p>A safety data transfer is a continuous memory array that has to be copied from one part of the communication frame to another part of the communication frame. The data to transfer is defined by:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>a first offset in the communication frame where the data must be read</p></li>
+<li><p>a second offset in the communication frame where the data must be written to</p></li>
+<li><p>the length of the data to transfer.</p></li>
+</ol>
+</div></blockquote>
+<p>From a user perspective, the question is how to easily specify where the data is located in the communication frame for read and for write.
+Our solution is to specify in the URDF configuration file the first data for read and for write by specifying:</p>
+<ol class="arabic simple">
+<li><p>the name of the module, the data is coming from or going to</p></li>
+<li><p>the channel index and sub-index of the data in the module</p></li>
+</ol>
+<p>The read location is defined in the the &lt;in&gt; tag and the write location is defined in the &lt;out&gt; tag of a &lt;transfer&gt; tag.
+The length of the data to transfer is defined the attribute «size» of the &lt;transfer&gt; tag.</p>
+<p>The &lt;transfer&gt; tag is a child of a &lt;net&gt; tag inside the &lt;safety&gt; tag.</p>
+</section>
+<section id="configuration-of-the-field-bus-communication-and-ros2-data-exchanges">
+<h2>Configuration of the field bus communication and ROS2 data exchanges<a class="headerlink" href="#configuration-of-the-field-bus-communication-and-ros2-data-exchanges" title="Link to this heading"></a></h2>
+<p>From the user perspective modules are identified by their name, however in the EtherCAT network, modules are identified by their position (or alias) in the network.</p>
+<section id="on-init-stage">
+<h3>on_init stage<a class="headerlink" href="#on-init-stage" title="Link to this heading"></a></h3>
+<p>At the «on_init» stage, the Ethercat Driver for ROS2 will:</p>
+<ol class="arabic simple">
+<li><p>first, look for all the EtherCAT modules in the URDF configuration that are exposed to ROS2 and load the corresponding plugins and their configuration. It effectively  called the <code class="code docutils literal notranslate"><span class="pre">addSlave</span></code> method of the <code class="code docutils literal notranslate"><span class="pre">EcMaster</span></code> class for each of these modules.</p></li>
+<li><p>then, look for all the EtherCAT modules in the URDF that are «safety only» modules and load the corresponding plugins and their configuration. It effectively  called the <code class="code docutils literal notranslate"><span class="pre">addSlave</span></code> method of the <code class="code docutils literal notranslate"><span class="pre">EcMaster</span></code> class for each of these modules.</p></li>
+<li><p>Compute the map between transfers in terms of module, name, channel index and sub-index and the corresponding offsets in the communication frame.</p></li>
+</ol>
+<p>For each slave, in the add_slave method of the EcMaster class, the domain info are updated to prepare the ec_pdo_entry_reg_t data structures.
+EcSafety is a derived class of EcMaster incorporating the safety data transfers.
+So after each slave has been added, the safety data transfers are prepared such that all pointers to the offsets necessary for the safety data transfers are stored in the EcSafety class and will be ready when after the «on_activate» stage, the values pointed will contained the correct offset values.</p>
+</section>
+<section id="on-activate-stage">
+<h3>on_activate stage<a class="headerlink" href="#on-activate-stage" title="Link to this heading"></a></h3>
+<p>At the «on_activate» stage, the Ethercat Driver for ROS2 will:</p>
+<ol class="arabic simple">
+<li><p>Populate the ec_pdo_entry_reg_t data structures with the data with a call to the ecrt_domain_reg_pdo_entry_list function.</p></li>
+</ol>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, ICUBE Laboratory, University of Strasbourg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
