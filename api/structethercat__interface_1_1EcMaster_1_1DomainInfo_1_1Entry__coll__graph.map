@@ -1,4 +1,5 @@
 <map id="ethercat_interface::EcMaster::DomainInfo::Entry" name="ethercat_interface::EcMaster::DomainInfo::Entry">
-<area shape="rect" id="node1" title=" " alt="" coords="5,109,180,165"/>
-<area shape="rect" id="node2" href="$classethercat__interface_1_1EcSlave.html" title=" " alt="" coords="22,5,163,47"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,108,180,163"/>
+<area shape="rect" id="Node000002" href="$classethercat__interface_1_1EcSlave.html" title=" " alt="" coords="22,5,163,45"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="95,59,95,108,90,108,90,59"/>
 </map>

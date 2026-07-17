@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['load_5ffrom_5fconfig_0',['load_from_config',['../classethercat__interface_1_1EcPdoChannelManager.html#add99892e89046154b8b5e32ba527d4dd',1,'ethercat_interface::EcPdoChannelManager::load_from_config()'],['../classethercat__interface_1_1EcPdoGroupInterfaceChannelManager.html#a3dfd228bf7cd6e1787aa1a48a7b6bdef',1,'ethercat_interface::EcPdoGroupInterfaceChannelManager::load_from_config()'],['../classethercat__interface_1_1EcPdoSingleInterfaceChannelManager.html#a9fbb5319aef3635d89de16b8e0623450',1,'ethercat_interface::EcPdoSingleInterfaceChannelManager::load_from_config()'],['../classethercat__interface_1_1SdoConfigEntry.html#a26e56ab55cfdd7a7e4e72aa2335830cd',1,'ethercat_interface::SdoConfigEntry::load_from_config()'],['../classethercat__interface_1_1SMConfig.html#a37ffc721380b77c39f049bfdbe2c925e',1,'ethercat_interface::SMConfig::load_from_config()']]],
-  ['loadtransferconfigyamlfile_1',['loadTransferConfigYamlFile',['../classethercat__driver_1_1EthercatBusManager.html#a8c8eb6396912b55120eae44000240b3d',1,'ethercat_driver::EthercatBusManager']]]
+  ['on_5factivate_0',['on_activate',['../classethercat__driver_1_1EthercatDriver.html#ae1a55b8b587c04bd364941f9ec8aa5da',1,'ethercat_driver::EthercatDriver']]],
+  ['on_5fconfigure_1',['on_configure',['../classethercat__driver_1_1EthercatDriver.html#a247cd9bfbf64a8915b084444d619b6ab',1,'ethercat_driver::EthercatDriver']]],
+  ['on_5fdeactivate_2',['on_deactivate',['../classethercat__driver_1_1EthercatDriver.html#acc14d903f14cf7a11860f92ac298902f',1,'ethercat_driver::EthercatDriver']]],
+  ['on_5finit_3',['on_init',['../classethercat__driver_1_1EthercatDriver.html#a419d8ae57e31fd4f5a0a35ca03a8e9eb',1,'ethercat_driver::EthercatDriver']]]
 ];

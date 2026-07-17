@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['ethercatcycleresult_0',['EthercatCycleResult',['../namespaceethercat__driver.html#a9d46d1b3b55f21e2a83c0d3070860a35',1,'ethercat_driver']]]
+  ['pdotype_0',['PdoType',['../namespaceethercat__interface.html#a36921a332ee2abf4ed1e02bf884b26de',1,'ethercat_interface']]]
 ];

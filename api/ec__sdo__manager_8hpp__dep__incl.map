@@ -2,11 +2,9 @@
 <area shape="rect" id="Node000001" title=" " alt="" coords="5,5,292,75"/>
 <area shape="rect" id="Node000002" href="$ec__slave_8hpp.html" title=" " alt="" coords="31,123,266,192"/>
 <area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="151,89,151,122,146,122,146,89"/>
-<area shape="rect" id="Node000003" href="$ethercat__bus__manager_8hpp.html" title=" " alt="" coords="42,357,255,441"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="114,205,97,241,90,275,97,309,106,333,119,356,115,358,101,335,91,310,85,275,91,239,109,202"/>
-<area shape="rect" id="Node000005" href="$ec__master_8hpp.html" title=" " alt="" coords="107,240,351,309"/>
-<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="182,202,207,238,203,241,178,205"/>
-<area shape="rect" id="Node000004" href="$ethercat__driver_8hpp.html" title=" " alt="" coords="21,489,276,559"/>
-<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="151,455,151,489,146,489,146,455"/>
-<area shape="poly" id="edge5_Node000005_Node000003" title=" " alt="" coords="202,322,178,359,173,356,197,319"/>
+<area shape="rect" id="Node000003" href="$ethercat__driver_8hpp.html" title=" " alt="" coords="21,357,276,427"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="114,205,97,241,90,275,97,309,107,333,122,356,117,358,103,336,91,310,85,275,91,239,109,202"/>
+<area shape="rect" id="Node000004" href="$ec__master_8hpp.html" title=" " alt="" coords="107,240,351,309"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="182,202,207,238,203,241,178,205"/>
+<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="199,323,174,359,170,356,195,319"/>
 </map>

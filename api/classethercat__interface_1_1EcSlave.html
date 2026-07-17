@@ -95,8 +95,6 @@ Public Types</h2></td></tr>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a9c1c5eadcf7796e19c5b498005aa10d1" id="r_a9c1c5eadcf7796e19c5b498005aa10d1"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a9c1c5eadcf7796e19c5b498005aa10d1">EcSlave</a> (uint32_t vendor_id, uint32_t product_id)</td></tr>
 <tr class="separator:a9c1c5eadcf7796e19c5b498005aa10d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3fcd55a519b450b43f737d4cebb02097" id="r_a3fcd55a519b450b43f737d4cebb02097"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a3fcd55a519b450b43f737d4cebb02097">EcSlave</a> (uint32_t vendor_id, uint32_t product_id, uint16_t alias, uint16_t position)</td></tr>
-<tr class="separator:a3fcd55a519b450b43f737d4cebb02097"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adf1d9a6bd0aa52527d1649d104a8c460" id="r_adf1d9a6bd0aa52527d1649d104a8c460"><td class="memItemLeft" align="right" valign="top">virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#adf1d9a6bd0aa52527d1649d104a8c460">~EcSlave</a> ()</td></tr>
 <tr class="separator:adf1d9a6bd0aa52527d1649d104a8c460"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4b425c22f8128ed1c1b3fa779a44fde4" id="r_a4b425c22f8128ed1c1b3fa779a44fde4"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a4b425c22f8128ed1c1b3fa779a44fde4">processData</a> (size_t, uint8_t *)</td></tr>
@@ -115,19 +113,11 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:ae47e35f724695b833a5244b54dc3c187"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac3598c47ab7c2eea58c571d6d5e2183f" id="r_ac3598c47ab7c2eea58c571d6d5e2183f"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#ac3598c47ab7c2eea58c571d6d5e2183f">domains</a> (<a class="el" href="classethercat__interface_1_1EcSlave.html#a8348bf7fd3dbfce01a1d7b8f8a4cdec8">DomainMap</a> &amp;) const</td></tr>
 <tr class="separator:ac3598c47ab7c2eea58c571d6d5e2183f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7748f3ead7008ace60c153cf8cd2c11c" id="r_a7748f3ead7008ace60c153cf8cd2c11c"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a7748f3ead7008ace60c153cf8cd2c11c">setupSlave</a> (std::unordered_map&lt; std::string, std::string &gt; slave_parameters, std::vector&lt; double &gt; *state_interface, std::vector&lt; double &gt; *command_interface)</td></tr>
-<tr class="separator:a7748f3ead7008ace60c153cf8cd2c11c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a72f26e10adcbd63a7505661cdc2b0c53" id="r_a72f26e10adcbd63a7505661cdc2b0c53"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a72f26e10adcbd63a7505661cdc2b0c53">setAliasAndPosition</a> (uint16_t alias, uint16_t position)</td></tr>
-<tr class="separator:a72f26e10adcbd63a7505661cdc2b0c53"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a45f2d80fcc1a46c1ba3af8239a9ca09d" id="r_a45f2d80fcc1a46c1ba3af8239a9ca09d"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a45f2d80fcc1a46c1ba3af8239a9ca09d">isAliasAndPositionSet</a> ()</td></tr>
-<tr class="separator:a45f2d80fcc1a46c1ba3af8239a9ca09d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae3b7e6ff047cc99c1fe1861414d57126" id="r_ae3b7e6ff047cc99c1fe1861414d57126"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#ae3b7e6ff047cc99c1fe1861414d57126">setupSlave</a> (std::unordered_map&lt; std::string, std::string &gt; slave_paramters, std::vector&lt; double &gt; *state_interface, std::vector&lt; double &gt; *command_interface)</td></tr>
+<tr class="separator:ae3b7e6ff047cc99c1fe1861414d57126"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:abaa72e737b102eaa2d9f46b4111d1b4a" id="r_abaa72e737b102eaa2d9f46b4111d1b4a"><td class="memItemLeft" align="right" valign="top">uint16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#abaa72e737b102eaa2d9f46b4111d1b4a">alias_</a></td></tr>
-<tr class="separator:abaa72e737b102eaa2d9f46b4111d1b4a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8846147156a0c694a7ba85fdab054ee2" id="r_a8846147156a0c694a7ba85fdab054ee2"><td class="memItemLeft" align="right" valign="top">uint16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a8846147156a0c694a7ba85fdab054ee2">position_</a></td></tr>
-<tr class="separator:a8846147156a0c694a7ba85fdab054ee2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad1ceda684dc1a3ffae76f824cdbaf6d3" id="r_ad1ceda684dc1a3ffae76f824cdbaf6d3"><td class="memItemLeft" align="right" valign="top">uint32_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#ad1ceda684dc1a3ffae76f824cdbaf6d3">vendor_id_</a></td></tr>
 <tr class="separator:ad1ceda684dc1a3ffae76f824cdbaf6d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a58601177e6507e7f9a7bd7e0513365b8" id="r_a58601177e6507e7f9a7bd7e0513365b8"><td class="memItemLeft" align="right" valign="top">uint32_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a58601177e6507e7f9a7bd7e0513365b8">product_id_</a></td></tr>
@@ -141,12 +131,10 @@ Protected Attributes</h2></td></tr>
 <tr class="separator:abab4300a3c376f5627131bcf89875029"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a86f74d5c54dc3642377f3f5361e80aac" id="r_a86f74d5c54dc3642377f3f5361e80aac"><td class="memItemLeft" align="right" valign="top">std::vector&lt; double &gt; *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a86f74d5c54dc3642377f3f5361e80aac">command_interface_ptr_</a></td></tr>
 <tr class="separator:a86f74d5c54dc3642377f3f5361e80aac"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaf960caaad2e4ab5d657fd8470ff7638" id="r_aaf960caaad2e4ab5d657fd8470ff7638"><td class="memItemLeft" align="right" valign="top">std::unordered_map&lt; std::string, std::string &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#aaf960caaad2e4ab5d657fd8470ff7638">parameters_</a></td></tr>
-<tr class="separator:aaf960caaad2e4ab5d657fd8470ff7638"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad35bb42510e002af9b2cd4859d218319" id="r_ad35bb42510e002af9b2cd4859d218319"><td class="memItemLeft" align="right" valign="top">std::unordered_map&lt; std::string, std::string &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#ad35bb42510e002af9b2cd4859d218319">paramters_</a></td></tr>
+<tr class="separator:ad35bb42510e002af9b2cd4859d218319"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac3fe60cd00db933e6dd21c1df290b32f" id="r_ac3fe60cd00db933e6dd21c1df290b32f"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#ac3fe60cd00db933e6dd21c1df290b32f">is_operational_</a> = false</td></tr>
 <tr class="separator:ac3fe60cd00db933e6dd21c1df290b32f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9b47998ceaf2b07d7e453fe4916d0381" id="r_a9b47998ceaf2b07d7e453fe4916d0381"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classethercat__interface_1_1EcSlave.html#a9b47998ceaf2b07d7e453fe4916d0381">is_alias_and_position_set_</a> = false</td></tr>
-<tr class="separator:a9b47998ceaf2b07d7e453fe4916d0381"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Typedef Documentation</h2>
 <a id="a8348bf7fd3dbfce01a1d7b8f8a4cdec8" name="a8348bf7fd3dbfce01a1d7b8f8a4cdec8"></a>
@@ -166,7 +154,7 @@ Protected Attributes</h2></td></tr>
 </div>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="a9c1c5eadcf7796e19c5b498005aa10d1" name="a9c1c5eadcf7796e19c5b498005aa10d1"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a9c1c5eadcf7796e19c5b498005aa10d1">&#9670;&#160;</a></span>EcSlave() <span class="overload">[1/2]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a9c1c5eadcf7796e19c5b498005aa10d1">&#9670;&#160;</a></span>EcSlave()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -185,54 +173,6 @@ Protected Attributes</h2></td></tr>
           <td></td>
           <td class="paramtype">uint32_t&#160;</td>
           <td class="paramname"><em>product_id</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="a3fcd55a519b450b43f737d4cebb02097" name="a3fcd55a519b450b43f737d4cebb02097"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a3fcd55a519b450b43f737d4cebb02097">&#9670;&#160;</a></span>EcSlave() <span class="overload">[2/2]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">ethercat_interface::EcSlave::EcSlave </td>
-          <td>(</td>
-          <td class="paramtype">uint32_t&#160;</td>
-          <td class="paramname"><em>vendor_id</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">uint32_t&#160;</td>
-          <td class="paramname"><em>product_id</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">uint16_t&#160;</td>
-          <td class="paramname"><em>alias</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">uint16_t&#160;</td>
-          <td class="paramname"><em>position</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -308,7 +248,7 @@ Protected Attributes</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
-<p>read or write data to the domain from the index of the entry in the recorded pdos </p>
+<p>read or write data to the domain </p>
 
 </div>
 </div>
@@ -493,8 +433,8 @@ Protected Attributes</h2></td></tr>
 
 </div>
 </div>
-<a id="a7748f3ead7008ace60c153cf8cd2c11c" name="a7748f3ead7008ace60c153cf8cd2c11c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a7748f3ead7008ace60c153cf8cd2c11c">&#9670;&#160;</a></span>setupSlave()</h2>
+<a id="ae3b7e6ff047cc99c1fe1861414d57126" name="ae3b7e6ff047cc99c1fe1861414d57126"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae3b7e6ff047cc99c1fe1861414d57126">&#9670;&#160;</a></span>setupSlave()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -506,7 +446,7 @@ Protected Attributes</h2></td></tr>
           <td class="memname">virtual bool ethercat_interface::EcSlave::setupSlave </td>
           <td>(</td>
           <td class="paramtype">std::unordered_map&lt; std::string, std::string &gt;&#160;</td>
-          <td class="paramname"><em>slave_parameters</em>, </td>
+          <td class="paramname"><em>slave_paramters</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -535,96 +475,7 @@ Protected Attributes</h2></td></tr>
 
 </div>
 </div>
-<a id="a72f26e10adcbd63a7505661cdc2b0c53" name="a72f26e10adcbd63a7505661cdc2b0c53"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a72f26e10adcbd63a7505661cdc2b0c53">&#9670;&#160;</a></span>setAliasAndPosition()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void ethercat_interface::EcSlave::setAliasAndPosition </td>
-          <td>(</td>
-          <td class="paramtype">uint16_t&#160;</td>
-          <td class="paramname"><em>alias</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">uint16_t&#160;</td>
-          <td class="paramname"><em>position</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="a45f2d80fcc1a46c1ba3af8239a9ca09d" name="a45f2d80fcc1a46c1ba3af8239a9ca09d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a45f2d80fcc1a46c1ba3af8239a9ca09d">&#9670;&#160;</a></span>isAliasAndPositionSet()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">bool ethercat_interface::EcSlave::isAliasAndPositionSet </td>
-          <td>(</td>
-          <td class="paramname"></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
 <h2 class="groupheader">Member Data Documentation</h2>
-<a id="abaa72e737b102eaa2d9f46b4111d1b4a" name="abaa72e737b102eaa2d9f46b4111d1b4a"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#abaa72e737b102eaa2d9f46b4111d1b4a">&#9670;&#160;</a></span>alias_</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">uint16_t ethercat_interface::EcSlave::alias_</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="a8846147156a0c694a7ba85fdab054ee2" name="a8846147156a0c694a7ba85fdab054ee2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a8846147156a0c694a7ba85fdab054ee2">&#9670;&#160;</a></span>position_</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">uint16_t ethercat_interface::EcSlave::position_</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
 <a id="ad1ceda684dc1a3ffae76f824cdbaf6d3" name="ad1ceda684dc1a3ffae76f824cdbaf6d3"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ad1ceda684dc1a3ffae76f824cdbaf6d3">&#9670;&#160;</a></span>vendor_id_</h2>
 
@@ -711,8 +562,8 @@ Protected Attributes</h2></td></tr>
 
 </div>
 </div>
-<a id="aaf960caaad2e4ab5d657fd8470ff7638" name="aaf960caaad2e4ab5d657fd8470ff7638"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aaf960caaad2e4ab5d657fd8470ff7638">&#9670;&#160;</a></span>parameters_</h2>
+<a id="ad35bb42510e002af9b2cd4859d218319" name="ad35bb42510e002af9b2cd4859d218319"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad35bb42510e002af9b2cd4859d218319">&#9670;&#160;</a></span>paramters_</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -721,7 +572,7 @@ Protected Attributes</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">std::unordered_map&lt;std::string, std::string&gt; ethercat_interface::EcSlave::parameters_</td>
+          <td class="memname">std::unordered_map&lt;std::string, std::string&gt; ethercat_interface::EcSlave::paramters_</td>
         </tr>
       </table>
   </td>
@@ -744,28 +595,6 @@ Protected Attributes</h2></td></tr>
       <table class="memname">
         <tr>
           <td class="memname">bool ethercat_interface::EcSlave::is_operational_ = false</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="a9b47998ceaf2b07d7e453fe4916d0381" name="a9b47998ceaf2b07d7e453fe4916d0381"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a9b47998ceaf2b07d7e453fe4916d0381">&#9670;&#160;</a></span>is_alias_and_position_set_</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">bool ethercat_interface::EcSlave::is_alias_and_position_set_ = false</td>
         </tr>
       </table>
   </td>

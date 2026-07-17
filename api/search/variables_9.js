@@ -1,12 +1,7 @@
 var searchData=
 [
-  ['managed_5f_0',['managed_',['../classethercat__interface_1_1EcPdoGroupInterfaceChannelManager.html#a7c9f03d792aca21efd36e7f9cf5be791',1,'ethercat_interface::EcPdoGroupInterfaceChannelManager']]],
-  ['mask_1',['mask',['../structethercat__interface_1_1InterfaceData.html#af7c39ceceab5b60886c397c5ee3b042a',1,'ethercat_interface::InterfaceData']]],
-  ['master_2',['master',['../classethercat__interface_1_1EcTransferNet.html#a86b842483aef593334fb616c7643f057',1,'ethercat_interface::EcTransferNet']]],
-  ['master_5f_3',['master_',['../classethercat__driver_1_1EthercatBusManager.html#af105820ba577f825f02d50cc5c94aed0',1,'ethercat_driver::EthercatBusManager::master_'],['../classethercat__interface_1_1EcMaster.html#a4c714f3724fbd174c6b5bff254a8ef8c',1,'ethercat_interface::EcMaster::master_']]],
-  ['master_5fid_4',['master_id',['../structethercat__driver_1_1EthercatBusConfig.html#a328d8646a56590392ceddd4fc36ad07d',1,'ethercat_driver::EthercatBusConfig']]],
-  ['master_5fstate_5f_5',['master_state_',['../classethercat__interface_1_1EcMaster.html#a7f056a7e7c8055c8c87c177dc4ace479',1,'ethercat_interface::EcMaster']]],
-  ['module_5fname_6',['module_name',['../classethercat__interface_1_1EcMemoryEntry.html#a46820fb0da9d97c90fb86194303edffd',1,'ethercat_interface::EcMemoryEntry']]],
-  ['module_5fnumber_7',['module_number',['../structethercat__driver_1_1ConfiguredEcModule.html#a9262a44f95b71ac8e78965f6d0ad99dc',1,'ethercat_driver::ConfiguredEcModule']]],
-  ['module_5ftype_8',['module_type',['../structethercat__driver_1_1ConfiguredEcModule.html#a9576f4c987771d906a1a180e41aa174b',1,'ethercat_driver::ConfiguredEcModule']]]
+  ['paramters_5f_0',['paramters_',['../classethercat__interface_1_1EcSlave.html#ad35bb42510e002af9b2cd4859d218319',1,'ethercat_interface::EcSlave']]],
+  ['pdo_5fname_1',['pdo_name',['../classethercat__interface_1_1SMConfig.html#a5c9300654023ef197811c74a97abc874',1,'ethercat_interface::SMConfig']]],
+  ['pdo_5ftype_2',['pdo_type',['../classethercat__interface_1_1EcPdoChannelManager.html#a9b7b8530fa97335bc1e603681531875a',1,'ethercat_interface::EcPdoChannelManager']]],
+  ['product_5fid_5f_3',['product_id_',['../classethercat__interface_1_1EcSlave.html#a58601177e6507e7f9a7bd7e0513365b8',1,'ethercat_interface::EcSlave']]]
 ];
