@@ -108,7 +108,7 @@ This configuration can be used for controlling a :code:`joint` component. Here i
         <param name="control_frequency">100</param>
       </hardware>
 
-     <joint name="joint_0">
+     <joint name="joint_1">
         <state_interface name="position"/>
         <state_interface name="velocity"/>
         <state_interface name="effort"/>
