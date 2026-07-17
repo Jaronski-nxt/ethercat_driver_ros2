@@ -12,6 +12,7 @@ find_package(ethercat_interface REQUIRED)
 find_package(ethercat_generic_slave REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 file(GLOB_RECURSE PLUGINS_SRC src/*.cpp)
 add_library(ethercat_generic_cia402_drive ${PLUGINS_SRC})
@@ -19,6 +20,7 @@ target_compile_features(ethercat_generic_cia402_drive PUBLIC c_std_99 cxx_std_17
 target_include_directories(ethercat_generic_cia402_drive PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+target_link_libraries(ethercat_generic_cia402_drive yaml-cpp::yaml-cpp)
 ament_target_dependencies(
   ethercat_generic_cia402_drive
   ethercat_interface

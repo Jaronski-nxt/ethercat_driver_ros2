@@ -9,6 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(yaml_cpp_vendor REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 # EtherLab
 set(ETHERLAB_DIR /usr/local/etherlab)
@@ -53,7 +55,6 @@ install(
 if(BUILD_TESTING)
   # find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
-  find_package(yaml_cpp_vendor REQUIRED)
   ament_lint_auto_find_test_dependencies()
 
   # Test PdoChannelManager
@@ -62,6 +63,7 @@ if(BUILD_TESTING)
     test/test_ec_pdo_channel_manager.cpp
   )
   target_include_directories(test_ec_pdo_channel_manager PRIVATE include ${ETHERLAB_DIR}/include)
+  target_link_libraries(test_ec_pdo_channel_manager yaml-cpp::yaml-cpp)
   ament_target_dependencies(test_ec_pdo_channel_manager
     yaml_cpp_vendor
   )
@@ -77,5 +79,6 @@ ament_export_libraries(
 )
 ament_export_dependencies(
   rclcpp
+  yaml_cpp_vendor
 )
 ament_package()

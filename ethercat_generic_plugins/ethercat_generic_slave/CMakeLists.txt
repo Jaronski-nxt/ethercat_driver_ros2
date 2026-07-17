@@ -11,6 +11,7 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(ethercat_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 file(GLOB_RECURSE PLUGINS_SRC src/*.cpp)
 add_library(ethercat_generic_slave ${PLUGINS_SRC})
@@ -18,6 +19,7 @@ target_compile_features(ethercat_generic_slave PUBLIC c_std_99 cxx_std_17)  # Re
 target_include_directories(ethercat_generic_slave PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+target_link_libraries(ethercat_generic_slave yaml-cpp::yaml-cpp)
 ament_target_dependencies(
   ethercat_generic_slave
   ethercat_interface
